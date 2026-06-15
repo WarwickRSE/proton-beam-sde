@@ -113,6 +113,14 @@ struct Material {
     return;
   }
 
+  /**
+   * Bethe-bloch ineleastic mean energy loss, Eq 3 (Eq 4 for mixture)
+  per unit track length
+  * Depends on density (rho), atomic number (Z), atomic Mass (A) and
+   mean excitation energy (I)
+   * ALSO depends on e, the energy of the Particle
+  @param e Energy of particle being scattered
+   */
   double bethe_bloch(const double e) const {
     double mecsq = 0.511;   // mass of electron * speed of light squared, MeV
     double mpcsq = 938.346; // mass of proton * speed of light squared, MeV
@@ -126,6 +134,15 @@ struct Material {
     return ret;
   }
 
+/** Moliere's small angle elastic
+* See P 7 and 8
+* chi_c and chi_a and omega are partial factors which are not named
+* v is used for w in eq for sigma
+* RETURNS the std-dev
+* @param e energy of particle being scattered
+* @param dt distance? travelled?
+* @return sigma-E for this process
+*/
   double multiple_scattering_sd(const double e, const double dt) const {
     double mpcsq = 938.346; // mass of proton * speed of light squared, MeV
     double pv = (2 * mpcsq + e) * e / (mpcsq + e);
@@ -157,6 +174,12 @@ struct Material {
     return ret;
   }
 
+/** Energy straggling Eq 5
+* Depends on particle Lorentz factor (thus energy)
+* Atomic mass (A), atomic number (Z), 
+* @param e Energy of particle being scattered
+* @return The volatility (which relates to SD)
+*/
   double energy_straggling_sd(const double e) const {
     double alpha = 1 / 137.0;
     double log_hbar = -21 * log(10) + log(4.136) - log(2 * M_PI); // MeV * s
@@ -176,6 +199,12 @@ struct Material {
     return sqrt(ret);
   }
 
+  /**
+   * @brief 
+   * 
+   * @param e 
+   * @return 
+   */
   double nonelastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
     double log_barns_to_cmsq = -24 * log(10);
@@ -233,6 +262,7 @@ struct Material {
                           gsl_rng *gen) const {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
+    // QUERY - is ne_rate.evaluate pure? (note ind is changing) Where does e change in this function?
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].ne_rate.evaluate(e);
     }
@@ -255,6 +285,7 @@ struct Material {
                                   gsl_rng *gen) const {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
+    // QUERY - is el_ruth_rate.evaluate pure? Where does e change in this function?
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].el_ruth_rate.evaluate(e);
     }

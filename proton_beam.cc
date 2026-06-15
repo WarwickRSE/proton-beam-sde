@@ -12,6 +12,18 @@
 
 struct proton_path {
 
+  /**
+   * @brief Construct a proton path
+   * 
+   * Starts with 
+   * @param e0 
+   * @param dt 
+   * @param absorption_e 
+   * @param change_points_x 
+   * @param change_points_y 
+   * @param interval_materials 
+   * @param materials 
+   */
   proton_path(const double e0, const double dt, const double absorption_e,
               const std::vector<double> &change_points_x,
               const std::vector<double> &change_points_y,
@@ -39,6 +51,19 @@ struct proton_path {
     return;
   }
 
+  /**
+   * @brief ??
+   *
+   * Run proton track through specified material setup applying only BetheBloch. If energy gets below absorption_e the track ends
+   * @param e0 The initial energy
+   * @param dt The track step size
+   * @param absorption_e The minimum energy to continue tracking
+   * @param change_points_x Co-ordinate location of change to next material
+   * @param change_points_y Co-ordinate location of change to next material 
+   * @param interval_materials 2-D list of materials in x and y for each region
+   * @param materials Map from Material number to actual material
+   * @return Vector of energy at each step
+   */
   std::vector<double>
   solve_central_ode(const double e0, const double dt, const double absorption_e,
                     const std::vector<double> &change_points_x,
@@ -147,6 +172,19 @@ struct proton_path {
     return y;
   }
 
+  /**
+   * @brief Spherical Brownian motion evaluation
+   * 
+   * 
+   * @param dt 
+   * @param ix 
+   * @param gen 
+   * @param mat 
+   * @param prev_x_change 
+   * @param next_x_change 
+   * @param y_change 
+   * @return 
+   */
   double spherical_bm(const double dt, int &ix, gsl_rng *gen,
                       const Material &mat, const double prev_x_change,
                       const double next_x_change, const double y_change) {
@@ -155,6 +193,8 @@ struct proton_path {
     z[2] = cos(omega[ix - 1][0]);
     double y = wright_fisher(
         pow(mat.multiple_scattering_sd(energy[ix - 1], dt), 2), gen);
+    
+    // Random angle
     double theta = 2 * M_PI * gsl_rng_uniform(gen);
     // Set up defaults for when z is near (0, 0, 1)
     u[0] = 1 / sqrt(2);
