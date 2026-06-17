@@ -206,23 +206,23 @@ struct Material {
    * @return 
    */
   double nonelastic_rate(const double e) const {
-    double log_avogadro = log(6) + 23 * log(10);
-    double log_barns_to_cmsq = -24 * log(10);
+    double log_avogadro = log(6) + 23 * log(10); //log (N_A)
+    double log_barns_to_cmsq = -24 * log(10); // log (10^{-24})
     double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
-      a += x[i] * at[i].a; // average molar mass
+      a += x[i] * at[i].a; // average molar mass A
       ret += x[i] * at[i].ne_rate.evaluate(e);
     }
     double log_molecule_density =
-        log(density) + log_avogadro - log(a); // molecules / cm^3
+        log(density) + log_avogadro - log(a); // log(rho N_A 10^{-24}/A) molecules / cm^3
     ret *= exp(log_barns_to_cmsq + log_molecule_density);
     return ret; // rate per cm
   }
 
   double rutherford_and_elastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
-    double log_barns_to_cmsq = -24 * log(10);
+    double log_barns_to_cmsq = -24 * log(10); // log (10^{-24})
     double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
@@ -234,9 +234,24 @@ struct Material {
     ret *= exp(log_barns_to_cmsq + log_molecule_density);
     return ret; // rate per cm
   }
-
+  /**
+   * @brief Updates the direction of transport according to scattering angles
+   * 
+   * @param ang - direction of transport given in spherical coordinates on unit sphere
+   * @param alpha - polar scattering angle
+   * @param beta - azimutal scattering angle 
+   * @return 
+   */
   void compute_new_angle(std::vector<double> &ang, const double alpha,
                          const double beta) const {
+
+    // Compute new transport direction 
+    // omega_new = cos(alpha)e_r + sin(alpha)(sin(beta) e_theta + cos(beta) e_phi)
+    // Where:
+    // theta=ang[0], phi=ang[1]
+    // e_r = (sin(theta)cos(phi), sin(theta)sin(phi), cos(theta))
+    // e_theta = (cos(theta)cos(phi),cos(theta)sin(phi), -sin(theta))
+    // e_phi = (-sin(phi), cos(phi), 0)  
     double omega_new1 =
         sin(ang[0]) * cos(ang[1]) * cos(alpha) +
         (cos(ang[0]) * cos(ang[1]) * sin(beta) - sin(ang[1]) * cos(beta)) *
@@ -253,6 +268,8 @@ struct Material {
     omega_new1 /= magnitude;
     omega_new2 /= magnitude;
     omega_new3 /= magnitude;
+
+    // Convert to spherical coordinates
     ang[0] = acos(omega_new3);
     ang[1] = atan2(omega_new2, omega_new1);
     return;

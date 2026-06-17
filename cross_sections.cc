@@ -172,6 +172,12 @@ struct CS_1d {
 
   CS_1d() : energy(), rate() {}
 
+  /**
+   * @brief Linear interpolation of rate from data
+   * 
+   * @param e energy
+   * @return rate
+   */
   double evaluate(const double e) const {
     double ret = 0;
     int r;
