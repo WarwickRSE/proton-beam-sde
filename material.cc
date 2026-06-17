@@ -23,13 +23,20 @@ struct Atom {
         ne_rate(other.ne_rate), el_ruth_angle_cdf(other.el_ruth_angle_cdf),
         ne_energy_angle(other.ne_energy_angle) {}
 
+  /** Compute separation energies for incident particles (S_a)
+   * S_a as in Section 6.2.3.2 on p. 137 [4]
+   * References:
+   * [4] https://doi.org/10.2172/1425114
+   * @return S_a
+   */
   double s() const {
-    double a_c = a + 1;
-    double n_c = a - z;
-    double z_c = z + 1;
-    double a_a = a;
-    double n_a = a - z;
-    double z_a = z;
+    double a_c = a + 1; // mass number compound nuclei
+    double n_c = a - z; // neutron number compound nuclei
+    double z_c = z + 1; // proton number compound nuclei
+    double a_a = a; // mass number target nuclei
+    double n_a = a - z; // neutron number target nuclei
+    double z_a = z; // proton number target nuclei
+    // S_a p. 137 [4]
     double ret = 15.68 * (a_c - a_a) -
                  28.07 * (pow(n_c - z_c, 2) / a_c - pow(n_a - z_a, 2) / a_a) -
                  18.56 * (pow(a_c, 2 / 3) - pow(a_a, 2 / 3)) +
@@ -41,23 +48,39 @@ struct Atom {
     return ret;
   }
 
+  /** Sample from distribution of nonelastic collision
+   * 
+   * References:
+   * [1] https://doi.org/10.1088/1361-6560/ae5586
+   * [4] https://doi.org/10.2172/1425114
+   * @param e
+   * @param alpha
+   * @param gen
+   * @return 
+   */
   void sample_nonelastic_collision(double &e, double &alpha,
                                    gsl_rng *gen) const {
     double out_rvalue, out_energy_cm;
     ne_energy_angle.sample(e, out_rvalue, out_energy_cm, gen);
-    double eps_a = a * e / (a + 1);
-    double eps_b = (a + 1) * out_energy_cm / a;
-    double e_a = eps_a + s();
-    double e_b = eps_b + s();
+
+    // [4] Section 6.2.3.2 after Eq (6.4) on p. 137
+    double eps_a = a * e / (a + 1); // enrance channel energy p. 136 with a=AWR_A A-target particle, AWR_a=1 a-incident projectile
+    double eps_b = (a + 1) * out_energy_cm / a; // emission channel energy p.136
+    double e_a = eps_a + s(); // s = S_a
+    double e_b = eps_b + s(); // s = S_b
     double x1 = fmin(e_a, 130) * e_b / e_a;
     double x3 = fmin(e_a, 41) * e_b / e_a;
     double aval = 0.04 * x1 + 1.8 * 1e-6 * pow(x1, 3) + 6.7 * 1e-7 * pow(x3, 4);
+
+    
     double cdfc2 = out_rvalue * cosh(aval) - sinh(aval);
     double cdfc1 = 2 * sinh(aval);
     double u2 = gsl_rng_uniform(gen);
-    double z1 = cdfc1 * u2 + cdfc2;
+    double z1 = cdfc1 * u2 + cdfc2; // C [1] p.10
     double z2 =
-        (z1 + sqrt(pow(z1, 2) - pow(out_rvalue, 2) + 1)) / (out_rvalue + 1);
+        (z1 + sqrt(pow(z1, 2) - pow(out_rvalue, 2) + 1)) / (out_rvalue + 1); // \mu p.10 [1]
+    
+    
     double out_angle_cm = log(z2) / aval;
     double out_energy_lab =
         out_energy_cm + e / pow(a + 1, 2) +
