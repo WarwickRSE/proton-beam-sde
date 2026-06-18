@@ -1,4 +1,4 @@
-#include "cross_sections.cc"
+#include "cross_sections.h"
 #include <cstdlib>
 #include <vector>
 

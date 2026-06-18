@@ -1,7 +1,7 @@
-#include "cross_sections.cc"
-#include "grid.cc"
-#include "material.cc"
-#include "proton_beam.cc"
+#include "cross_sections.h"
+#include "grid.h"
+#include "material.h"
+#include "proton_beam.h"
 #include <cfloat>
 #include <cstdlib>
 #include <gsl/gsl_randist.h>

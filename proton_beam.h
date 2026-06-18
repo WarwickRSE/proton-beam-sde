@@ -1,4 +1,4 @@
-#include "material.cc"
+#include "material.h"
 #include <cmath>
 #include <cstdlib>
 #include <gsl/gsl_randist.h>
