@@ -60,6 +60,8 @@ struct Atom {
    */
   void sample_nonelastic_collision(double &e, double &alpha,
                                    gsl_rng *gen) const {
+
+    // Sample precompound fraction r and outgoing energy from data
     double out_rvalue, out_energy_cm;
     ne_energy_angle.sample(e, out_rvalue, out_energy_cm, gen);
 
@@ -72,16 +74,22 @@ struct Atom {
     double x3 = fmin(e_a, 41) * e_b / e_a;
     double aval = 0.04 * x1 + 1.8 * 1e-6 * pow(x1, 3) + 6.7 * 1e-7 * pow(x3, 4);
 
-    
+    // Get cosine of outgoing scattering angle in centre-of-mass frame
     double cdfc2 = out_rvalue * cosh(aval) - sinh(aval);
     double cdfc1 = 2 * sinh(aval);
     double u2 = gsl_rng_uniform(gen);
     double z1 = cdfc1 * u2 + cdfc2; // C [1] p.10
     double z2 =
         (z1 + sqrt(pow(z1, 2) - pow(out_rvalue, 2) + 1)) / (out_rvalue + 1); // \mu p.10 [1]
-    
-    
-    double out_angle_cm = log(z2) / aval;
+    double out_angle_cm = log(z2) / aval; // ? Is this part somehow missing in the identity for \mu on p.10 in [1]
+
+
+    // Eq. (6.7) in Section 6.2.3.2 in [4] with
+    // mass of incident particle (proton) AWR_a = 1, mass of emitted particle (proton) AWR_b=1
+    // mass of target AWR_A = a
+    // out_energy_lab = E_b,lab - energy of emitted particle in lab frame
+    // out_energy_cm = E_b,cm - energy of emitted particle in centre-of-mass frame
+    // e = E_a,lab - energy of incoming particle in lab farme
     double out_energy_lab =
         out_energy_cm + e / pow(a + 1, 2) +
         2 * sqrt(out_energy_cm * e) * out_angle_cm / (a + 1);
@@ -100,7 +108,7 @@ struct Atom {
   const double a;
   const int z;
   CS_1d el_ruth_rate, ne_rate;
-  CS_2d el_ruth_angle_cdf;
+  CS_2d el_ruth_angle_cdf; // ? This might be \Pi_e read in from data (cumulative distribution function of the scattering angle for large angle ealstic scattering)
   CS_3d ne_energy_angle;
 };
 
@@ -302,7 +310,7 @@ struct Material {
                           gsl_rng *gen) const {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
-    // QUERY - is ne_rate.evaluate pure? (note ind is changing) Where does e change in this function?
+    // QUERY - is ne_rate.evaluate pure? (note ind is changing) Where does e change in this function? - I think e only changes in sample_nonelastic_collision below
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].ne_rate.evaluate(e);
     }
@@ -326,6 +334,8 @@ struct Material {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
     // QUERY - is el_ruth_rate.evaluate pure? Where does e change in this function?
+    // In text under Eq. (2) in [1] it says elastic scattering corresponds to u_n=0 
+    // according to Eq. (1) means the energy remains unchanged
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].el_ruth_rate.evaluate(e);
     }

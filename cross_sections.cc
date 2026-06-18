@@ -288,6 +288,7 @@ struct CS_3d {
   }
 
   void sample(const double e, double &r, double &out_e_cm, gsl_rng *gen) const {
+    // Get index of energy data closest to current energy
     int energy_index = std::distance(
         energy.begin(), std::lower_bound(energy.begin(), energy.end(), e));
     double u = gsl_rng_uniform(gen);
@@ -320,9 +321,22 @@ struct CS_3d {
   std::vector<double> energy;
   std::vector<std::vector<double>> exit_energy, cdf, rvalue;
 };
-
+/**
+ * Struct for sampling exit angles from data for large angle elastic scattering
+ * 
+ * CDF given in Eq. (9) in [1]
+ * 
+ * References:
+ * [1] https://doi.org/10.1088/1361-6560/ae5586
+ */
 struct CS_2d {
-
+  /**
+   * Constructor
+   * 
+   * Reading in data from file
+   * @param filename
+   * @param cuttoff
+   */
   CS_2d(const std::string filename, const double cuttoff)
       : energy(), exit_angle(), cdf() {
     std::ifstream file;
@@ -403,7 +417,14 @@ struct CS_2d {
     }
     return out;
   }
-
+  /**
+   * Constructor
+   * 
+   * Reading in data from file
+   * @param filename
+   * @param cuttoff
+   * @param back_cutoff
+   */
   CS_2d(const std::string filename, const double cuttoff,
         const double back_cuttoff)
       : energy(), exit_angle(), cdf() {
@@ -479,26 +500,41 @@ struct CS_2d {
     }
     file.close();
   }
-
+  /**
+   * Copy constructor
+   */
   CS_2d(const CS_2d &other)
       : energy(other.energy), exit_angle(other.exit_angle), cdf(other.cdf) {}
 
+   /**
+   * Default constructor
+   */
   CS_2d() : energy(), exit_angle(), cdf() {}
 
+  /**
+   * Sample outgoing scattering angles from data 
+   * 
+   * @param energy_index - index for a specific energy data point
+   * @param u - random number for sampling
+   */
   double sample_from_energy_index(const double energy_index,
                                   const double u) const {
     double ret = 0;
     double diff = 0;
     double tol = 1e-7;
+    // Find cdf index for first cdf value larger than u
     int density_index =
         std::distance(cdf[energy_index].begin(),
                       std::lower_bound(cdf[energy_index].begin(),
                                        cdf[energy_index].end(), u));
+
+    // Use enpoints if outside data range
     if (density_index == 0) {
       ret = exit_angle[energy_index][0];
     } else if (density_index == int(cdf[energy_index].size())) {
       ret = exit_angle[energy_index].back();
     } else {
+      // Linear interpolation of angle from data
       if (cdf[energy_index][density_index] -
               cdf[energy_index][density_index - 1] >
           tol) {
@@ -514,7 +550,14 @@ struct CS_2d {
     return ret;
   }
 
+  /**
+   * Sample outgoing scattering angles from data 
+   * 
+   * @param e - energy
+   * @param gen
+   */
   double sample(const double e, gsl_rng *gen) const {
+    // Find closest energy in data that is larger than e
     int energy_index = std::distance(
         energy.begin(), std::lower_bound(energy.begin(), energy.end(), e));
     double u = gsl_rng_uniform(gen);
@@ -522,11 +565,13 @@ struct CS_2d {
     double out_angle_cm_2;
     double diff;
     double tol = 1e-7;
+    // If energy outside data range use closest point in data
     if (energy_index == 0) {
       out_angle_cm = sample_from_energy_index(0, u);
     } else if (energy_index == int(energy.size())) {
       out_angle_cm = sample_from_energy_index(energy_index - 1, u);
     } else {
+      // Otherwise linear interpolation from sampled angles
       out_angle_cm = sample_from_energy_index(energy_index, u);
       if (energy[energy_index] - energy[energy_index - 1] > tol) {
         out_angle_cm_2 = sample_from_energy_index(energy_index - 1, u);
@@ -538,8 +583,8 @@ struct CS_2d {
     return out_angle_cm;
   }
 
-  std::vector<double> energy;
-  std::vector<std::vector<double>> exit_angle, cdf;
+  std::vector<double> energy; // energy data
+  std::vector<std::vector<double>> exit_angle, cdf; // angle data and corresponding cdf
 };
 
 #endif

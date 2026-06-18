@@ -423,31 +423,44 @@ struct proton_path {
       y_half = 1;
     }
     while (energy[ix - 1] > absorption_energy) {
+      // Eq. (1) in [1] except (u_n, D_n)
       time_step = spherical_bm(
           dt, ix, gen,
           materials[interval_materials[material_index - 1][y_half]],
           change_points_x[material_index - 1], change_points_x[material_index],
           change_points_y[material_index - 1]);
 
+      // Large scattering events from data
+      // Corresponds to adding contributions from u_n, D_n in Eq. (1) in [1]
       // NOTE: ix was incremented inside spherical_bm. 
+      // ? I think this is the bullet point around Eq. (2) in [1]
       if (energy[ix - 1] > absorption_energy) {
+        // Determine probability of large scattering event based on jump rates \sigma_e and \sigma_ne (given in data)
         nonelastic_jump_rate =
             materials[interval_materials[material_index - 1][y_half]]
-                .nonelastic_rate(energy[ix - 1]);
+                .nonelastic_rate(energy[ix - 1]); // ? Is this \sigma_ne?
         rutherford_elastic_jump_rate =
             materials[interval_materials[material_index - 1][y_half]]
-                .rutherford_and_elastic_rate(energy[ix - 1]);
-        alpha = rutherford_elastic_jump_rate + nonelastic_jump_rate;
+                .rutherford_and_elastic_rate(energy[ix - 1]); // ? And this \sigma_e
+        alpha = rutherford_elastic_jump_rate + nonelastic_jump_rate; 
+
+        // If large scattering event occurs
         if (gsl_rng_uniform(gen) < 1 - exp(-alpha * time_step)) {
-          if (gsl_rng_uniform(gen) < rutherford_elastic_jump_rate / alpha) {
+          // Elastic scattering even
+          if (gsl_rng_uniform(gen) < rutherford_elastic_jump_rate / alpha) { // ? \sigma_e/(\sigma_e + \sigma_ne)
             materials[interval_materials[material_index - 1][y_half]]
                 .rutherford_elastic_scatter(omega[ix - 1], energy[ix - 1], gen);
-          } else {
+          }
+          // Inelastic scattering event. 
+          else {
             materials[interval_materials[material_index - 1][y_half]]
                 .nonelastic_scatter(omega[ix - 1], energy[ix - 1], gen);
           }
         }
+        // else: (u_n, D_n) = (0, (0, 0, 0)) absence of large scattering event in track length
       }
+
+      // Update material index if material boundary reached
       if (fabs(x[ix - 1][0] - change_points_x[material_index]) < 1e-9) {
         material_index++;
         if (x[ix - 1][1] > change_points_y[material_index - 1]) {
