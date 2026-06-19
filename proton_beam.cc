@@ -10,6 +10,24 @@
 #ifndef PB
 #define PB
 
+/*Claude - Can you reason why the constructor for proton_path calls 'solve_central_ode' ?
+
+Looking at the constructor and solve_central_ode function:
+
+The constructor calls solve_central_ode to determine how many steps the proton track will take before its energy drops below the absorption threshold.
+
+Here's the reasoning:
+
+Pre-allocation — The constructor needs to know in advance how many elements to allocate for the member vectors (energy, s, x, omega), so it must simulate the track first
+
+Getting the size — solve_central_ode returns a vector of energy values (one per time step), and the constructor extracts its size:
+
+Then resizes — It uses that size to allocate space:
+
+What solve_central_ode does — It simulates the proton traveling through the material layers, applying Bethe-Bloch energy loss at each step until the energy falls below absorption_e. The number of steps depends on the initial energy, step size, and material composition—it's not known ahead of time.
+
+So essentially, the constructor "dry runs" the simulation to figure out the track length, then allocates the necessary storage. This is an efficient way to avoid over-allocating memory or using dynamic resizing during the actual simulation.
+*/
 struct proton_path {
 
   /**
