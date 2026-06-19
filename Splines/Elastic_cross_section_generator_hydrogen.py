@@ -259,3 +259,36 @@ for key in density.keys():
     f.write(tmp + "\n")
     bool = False
 f.close()
+
+"""
+Claude Haiku 4.5:
+This script generates elastic scattering cross-sections for proton-hydrogen collisions using nuclear scattering theory. Here's what it does:
+
+Key components:
+
+Mathematical helper functions — Compute complex calculations needed for nuclear physics:
+
+Nuclear_trig_constants() — Recursively evaluates trigonometric antiderivatives
+CDF_Poly_Eval() — Evaluates cumulative distribution functions (CDFs) using integration by parts
+Legendre_Coeff_Cal() — Generates Legendre polynomial coefficients
+Complex_Polar() — Converts rectangular to polar coordinates
+Physical scattering formulas:
+
+eta_eval() — Computes Coulomb parameter η (eta)
+Total_Rate_calc() — Calculates total scattering rate from 0 to angle y using both Rutherford (Coulomb) and nuclear scattering contributions
+CM_to_Lab_Frame() — Converts scattering angles from center-of-mass to laboratory frame
+Data processing:
+
+Parses ENDF hydrogen elastic scattering data
+Creates dense angle discretization (100 linear points + 600 points clustered near the Rutherford singularity)
+For each incident energy ≥1 MeV:
+Extracts Coulomb and nuclear scattering coefficients
+Evaluates the CDF at many angles
+Converts to lab frame (both forward and backward scattering)
+Normalizes the CDF
+Output — Writes hydrogen_el_ruth_cross_sec.txt containing energy levels, scattering angles, and normalized CDFs for use in Monte Carlo simulations
+
+The script essentially preprocesses rigorous quantum scattering calculations into interpolation-friendly tables for your proton therapy simulator.
+
+
+"""

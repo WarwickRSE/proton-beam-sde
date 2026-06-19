@@ -183,3 +183,35 @@ for key in CDF_Data.keys():
     tmp = " ".join([str(z) for z in CDF_Data[key][1]])
     f.write(tmp + "\n")
 f.close()
+
+
+"""
+This is a generalized version of the hydrogen elastic cross-section generator, designed to work with any target nucleus (here set to carbon-12). It generates CDFs for elastic scattering in Monte Carlo simulations.
+
+Main workflow:
+
+Configuration — Sets target nucleus (carbon: Z=6, A=12) and projectile (proton: Z=1, A=1)
+
+Physics functions:
+
+RutherfordCrossSecCalc() — Calculates pure Coulomb scattering cross-section
+CM_to_Lab_Frame() — Converts center-of-mass angles to lab frame
+DiscreteDensityConstructor() — Extracts angular probability distributions from ENDF data, separating odd-indexed (angles) and even-indexed (probabilities) coefficients
+Spline interpolation — splineConstructorAngle() creates cubic splines (k=3) from the discrete angle-probability data for smooth interpolation
+
+CDF construction — Total_CDF_constructor() builds cumulative distribution functions by:
+
+Using dense angular sampling: 100 linear points [-1, 0.9] + 10,000 clustered points near forward scattering
+Combining nuclear scattering (via spline integration) with Rutherford Coulomb scattering
+Converting angles to lab frame
+Multiplying by 
+2
+π
+2π for full azimuthal symmetry
+Data validation & cleanup:
+
+ErrorCheck() — Verifies monotonicity in both angle conversions and CDFs; fixes numerical errors
+Threshold_Truncator() — Truncates near forward scattering to avoid Rutherford singularity
+Renormalise_CDF() — Reverses arrays and normalizes to [0,1], extracting total cross-section (Poisson rates)
+Output — Writes carbon_el_ruth_cross_sec.txt with incident energies and normalized CDFs for simulation
+"""

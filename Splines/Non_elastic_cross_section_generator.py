@@ -47,3 +47,26 @@ for keys in densities_out.keys():
     tmp = " ".join([str(z) for z in densities_out[keys][2]])
     f.write(tmp + "\n")
 f.close()
+
+""" 
+Claude Haiku 4.5:
+This script processes nuclear physics data from ENDF (Evaluated Nuclear Data File) format files to extract and organize non-elastic cross-section information for argon. Here's what it does:
+
+Main steps:
+
+Parse ENDF data — Uses EndfParser to read two argon-related ENDF files:
+
+Energy-angle correlation data (argon_enang_ne.txt)
+Cross-section data (argon_cs_ne.txt)
+Process energy-angle distributions — For each incident energy, it:
+
+Accumulates secondary particle branch ratios from the b field
+Collects corresponding outgoing energies and angular distributions
+Normalizes the branch ratios to create a probability distribution (denstemp2)
+Generate output files — Writes three formatted text files:
+
+argon_ne_rate.txt — Cross-section values (in MeV) for each energy bin
+argon_ne_energyangle_cdf.txt — Cumulative density functions (CDFs) for outgoing particle energies and angles at each incident energy, used for Monte Carlo sampling in simulations
+The data is converted to MeV units (dividing by 1e6) and negative values are clamped to zero. This preprocessed data likely feeds into a particle transport simulation (like the Geant4 code in your workspace).
+
+ """
