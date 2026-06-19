@@ -70,7 +70,7 @@ struct proton_path {
   }
 
   /**
-   * @brief ??
+   * @brief Dry run to size the scoring grid
    *
    * Run proton track through specified material setup applying only BetheBloch. If energy gets below absorption_e the track ends
    * @param e0 The initial energy
