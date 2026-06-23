@@ -12,7 +12,7 @@ struct Atom {
       : a(a0), z(z0), el_ruth_rate(el_ruth_cs, cutoff), ne_rate(ne_r),
         el_ruth_angle_cdf(el_ruth_cs, cutoff), ne_energy_angle(ne_ea) {}
 
-  // Constructor for zero non-elastic rate for hydrogen
+  // Constructor for zero elastic rate for hydrogen
   Atom(const double a0, const int z0, const std::string el_ruth_cs,
        const double cutoff, const double back_cutoff)
       : a(a0), z(z0), el_ruth_rate(el_ruth_cs, cutoff, back_cutoff), ne_rate(),
@@ -107,9 +107,11 @@ struct Atom {
 
   const double a;
   const int z;
+  // Cross section scattering rates for large angle elastic scattering and nonelastic scattering
+  // NOTE: The factor of 10^{-24} * N_A * rho/A needs to be multiplied to get the rates in Eqs. (7) and (12) in [1].
   CS_1d el_ruth_rate, ne_rate;
-  CS_2d el_ruth_angle_cdf; // ? This might be \Pi_e read in from data (cumulative distribution function of the scattering angle for large angle ealstic scattering)
-  CS_3d ne_energy_angle;
+  CS_2d el_ruth_angle_cdf; // CDF for sampling exit angles from data for large angle elastic scattering (see Eq. (9) in [1])
+  CS_3d ne_energy_angle;  
 };
 
 struct Material {
@@ -251,6 +253,12 @@ struct Material {
     return ret; // rate per cm
   }
 
+  /**
+   * @brief Retrieve scattering rate for Rutherford and elastic scattering
+   * 
+   * @param e - energy of particle being scattered
+   * @return  scattering rate sigma_e 
+   */
   double rutherford_and_elastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
     double log_barns_to_cmsq = -24 * log(10); // log (10^{-24})

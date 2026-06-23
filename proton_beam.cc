@@ -386,7 +386,6 @@ struct proton_path {
 
     // Eq (1) in [1]. Energy update (first line)
     // ? I get the wrong sign for one of the terms when comparing with the paper
-    // ? Does not have (1-u_n) term (is this computed inside simulate?)
     double bethe_block_update = mat.bethe_bloch(energy[ix - 1]) * time_step;
     energy[ix] = energy[ix - 1] -
                  fmin(fmax(bethe_block_update +
@@ -446,7 +445,7 @@ struct proton_path {
 
         // If large scattering event occurs
         if (gsl_rng_uniform(gen) < 1 - exp(-alpha * time_step)) {
-          // Elastic scattering even
+          // Elastic scattering event
           if (gsl_rng_uniform(gen) < rutherford_elastic_jump_rate / alpha) { // ? \sigma_e/(\sigma_e + \sigma_ne)
             materials[interval_materials[material_index - 1][y_half]]
                 .rutherford_elastic_scatter(omega[ix - 1], energy[ix - 1], gen);
