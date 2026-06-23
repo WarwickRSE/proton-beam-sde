@@ -12,7 +12,7 @@ struct Atom {
       : a(a0), z(z0), el_ruth_rate(el_ruth_cs, cutoff), ne_rate(ne_r),
         el_ruth_angle_cdf(el_ruth_cs, cutoff), ne_energy_angle(ne_ea) {}
 
-  // Constructor for zero non-elastic rate for hydrogen
+  // Constructor for zero elastic rate for hydrogen
   Atom(const double a0, const int z0, const std::string el_ruth_cs,
        const double cutoff, const double back_cutoff)
       : a(a0), z(z0), el_ruth_rate(el_ruth_cs, cutoff, back_cutoff), ne_rate(),
@@ -23,13 +23,20 @@ struct Atom {
         ne_rate(other.ne_rate), el_ruth_angle_cdf(other.el_ruth_angle_cdf),
         ne_energy_angle(other.ne_energy_angle) {}
 
+  /** Compute separation energies for incident particles (S_a)
+   * S_a as in Section 6.2.3.2 on p. 137 [4]
+   * References:
+   * [4] https://doi.org/10.2172/1425114
+   * @return S_a
+   */
   double s() const {
-    double a_c = a + 1;
-    double n_c = a - z;
-    double z_c = z + 1;
-    double a_a = a;
-    double n_a = a - z;
-    double z_a = z;
+    double a_c = a + 1; // mass number compound nuclei
+    double n_c = a - z; // neutron number compound nuclei
+    double z_c = z + 1; // proton number compound nuclei
+    double a_a = a; // mass number target nuclei
+    double n_a = a - z; // neutron number target nuclei
+    double z_a = z; // proton number target nuclei
+    // S_a p. 137 [4]
     double ret = 15.68 * (a_c - a_a) -
                  28.07 * (pow(n_c - z_c, 2) / a_c - pow(n_a - z_a, 2) / a_a) -
                  18.56 * (pow(a_c, 2 / 3) - pow(a_a, 2 / 3)) +
@@ -41,24 +48,48 @@ struct Atom {
     return ret;
   }
 
+  /** Sample from distribution of nonelastic collision
+   * 
+   * References:
+   * [1] https://doi.org/10.1088/1361-6560/ae5586
+   * [4] https://doi.org/10.2172/1425114
+   * @param e
+   * @param alpha
+   * @param gen
+   * @return 
+   */
   void sample_nonelastic_collision(double &e, double &alpha,
                                    gsl_rng *gen) const {
+
+    // Sample precompound fraction r and outgoing energy from data
     double out_rvalue, out_energy_cm;
     ne_energy_angle.sample(e, out_rvalue, out_energy_cm, gen);
-    double eps_a = a * e / (a + 1);
-    double eps_b = (a + 1) * out_energy_cm / a;
-    double e_a = eps_a + s();
-    double e_b = eps_b + s();
+
+    // [4] Section 6.2.3.2 after Eq (6.4) on p. 137
+    double eps_a = a * e / (a + 1); // enrance channel energy p. 136 with a=AWR_A A-target particle, AWR_a=1 a-incident projectile
+    double eps_b = (a + 1) * out_energy_cm / a; // emission channel energy p.136
+    double e_a = eps_a + s(); // s = S_a
+    double e_b = eps_b + s(); // s = S_b
     double x1 = fmin(e_a, 130) * e_b / e_a;
     double x3 = fmin(e_a, 41) * e_b / e_a;
     double aval = 0.04 * x1 + 1.8 * 1e-6 * pow(x1, 3) + 6.7 * 1e-7 * pow(x3, 4);
+
+    // Get cosine of outgoing scattering angle in centre-of-mass frame
     double cdfc2 = out_rvalue * cosh(aval) - sinh(aval);
     double cdfc1 = 2 * sinh(aval);
     double u2 = gsl_rng_uniform(gen);
-    double z1 = cdfc1 * u2 + cdfc2;
+    double z1 = cdfc1 * u2 + cdfc2; // C [1] p.10
     double z2 =
-        (z1 + sqrt(pow(z1, 2) - pow(out_rvalue, 2) + 1)) / (out_rvalue + 1);
-    double out_angle_cm = log(z2) / aval;
+        (z1 + sqrt(pow(z1, 2) - pow(out_rvalue, 2) + 1)) / (out_rvalue + 1); // \mu p.10 [1]
+    double out_angle_cm = log(z2) / aval; // ? Is this part somehow missing in the identity for \mu on p.10 in [1]
+
+
+    // Eq. (6.7) in Section 6.2.3.2 in [4] with
+    // mass of incident particle (proton) AWR_a = 1, mass of emitted particle (proton) AWR_b=1
+    // mass of target AWR_A = a
+    // out_energy_lab = E_b,lab - energy of emitted particle in lab frame
+    // out_energy_cm = E_b,cm - energy of emitted particle in centre-of-mass frame
+    // e = E_a,lab - energy of incoming particle in lab farme
     double out_energy_lab =
         out_energy_cm + e / pow(a + 1, 2) +
         2 * sqrt(out_energy_cm * e) * out_angle_cm / (a + 1);
@@ -76,9 +107,11 @@ struct Atom {
 
   const double a;
   const int z;
+  // Cross section scattering rates for large angle elastic scattering and nonelastic scattering
+  // NOTE: The factor of 10^{-24} * N_A * rho/A needs to be multiplied to get the rates in Eqs. (7) and (12) in [1].
   CS_1d el_ruth_rate, ne_rate;
-  CS_2d el_ruth_angle_cdf;
-  CS_3d ne_energy_angle;
+  CS_2d el_ruth_angle_cdf; // CDF for sampling exit angles from data for large angle elastic scattering (see Eq. (9) in [1])
+  CS_3d ne_energy_angle;  
 };
 
 struct Material {
@@ -206,23 +239,29 @@ struct Material {
    * @return 
    */
   double nonelastic_rate(const double e) const {
-    double log_avogadro = log(6) + 23 * log(10);
-    double log_barns_to_cmsq = -24 * log(10);
+    double log_avogadro = log(6) + 23 * log(10); //log (N_A)
+    double log_barns_to_cmsq = -24 * log(10); // log (10^{-24})
     double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
-      a += x[i] * at[i].a; // average molar mass
+      a += x[i] * at[i].a; // average molar mass A
       ret += x[i] * at[i].ne_rate.evaluate(e);
     }
     double log_molecule_density =
-        log(density) + log_avogadro - log(a); // molecules / cm^3
+        log(density) + log_avogadro - log(a); // log(rho N_A 10^{-24}/A) molecules / cm^3
     ret *= exp(log_barns_to_cmsq + log_molecule_density);
     return ret; // rate per cm
   }
 
+  /**
+   * @brief Retrieve scattering rate for Rutherford and elastic scattering
+   * 
+   * @param e - energy of particle being scattered
+   * @return  scattering rate sigma_e 
+   */
   double rutherford_and_elastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
-    double log_barns_to_cmsq = -24 * log(10);
+    double log_barns_to_cmsq = -24 * log(10); // log (10^{-24})
     double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
@@ -234,9 +273,24 @@ struct Material {
     ret *= exp(log_barns_to_cmsq + log_molecule_density);
     return ret; // rate per cm
   }
-
+  /**
+   * @brief Updates the direction of transport according to scattering angles
+   * 
+   * @param ang - direction of transport given in spherical coordinates on unit sphere
+   * @param alpha - polar scattering angle
+   * @param beta - azimutal scattering angle 
+   * @return 
+   */
   void compute_new_angle(std::vector<double> &ang, const double alpha,
                          const double beta) const {
+
+    // Compute new transport direction 
+    // omega_new = cos(alpha)e_r + sin(alpha)(sin(beta) e_theta + cos(beta) e_phi)
+    // Where:
+    // theta=ang[0], phi=ang[1]
+    // e_r = (sin(theta)cos(phi), sin(theta)sin(phi), cos(theta))
+    // e_theta = (cos(theta)cos(phi),cos(theta)sin(phi), -sin(theta))
+    // e_phi = (-sin(phi), cos(phi), 0)  
     double omega_new1 =
         sin(ang[0]) * cos(ang[1]) * cos(alpha) +
         (cos(ang[0]) * cos(ang[1]) * sin(beta) - sin(ang[1]) * cos(beta)) *
@@ -253,6 +307,8 @@ struct Material {
     omega_new1 /= magnitude;
     omega_new2 /= magnitude;
     omega_new3 /= magnitude;
+
+    // Convert to spherical coordinates
     ang[0] = acos(omega_new3);
     ang[1] = atan2(omega_new2, omega_new1);
     return;
@@ -262,7 +318,7 @@ struct Material {
                           gsl_rng *gen) const {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
-    // QUERY - is ne_rate.evaluate pure? (note ind is changing) Where does e change in this function?
+    // QUERY - is ne_rate.evaluate pure? (note ind is changing) Where does e change in this function? - I think e only changes in sample_nonelastic_collision below
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].ne_rate.evaluate(e);
     }
@@ -286,6 +342,8 @@ struct Material {
     double beta = 2 * M_PI * gsl_rng_uniform(gen);
     double rate = 0;
     // QUERY - is el_ruth_rate.evaluate pure? Where does e change in this function?
+    // In text under Eq. (2) in [1] it says elastic scattering corresponds to u_n=0 
+    // according to Eq. (1) means the energy remains unchanged
     for (unsigned int i = 0; i < at.size(); i++) {
       rate += x[i] * at[i].el_ruth_rate.evaluate(e);
     }
