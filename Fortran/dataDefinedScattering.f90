@@ -72,6 +72,15 @@ MODULE dataDefinedScattering
 
         X = NE_crossSections(ind)
     END FUNCTION
+    FUNCTION getRUCrossSection(name) RESULT(X)
+        CHARACTER(LEN=30) :: name
+        TYPE(crossSection1D) :: X
+        INTEGER :: ind
+
+        ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+
+        X = RU_crossSections(ind)
+    END FUNCTION
 
     !> \brief Helper - read a 1-D section
     SUBROUTINE fillCrossSections1D(file, crossSec)
@@ -142,7 +151,7 @@ MODULE dataDefinedScattering
             IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(fullpath)
             ! Find cutoff index
             ! TODO - check for off-by-one
-            f_ct = MINLOC(tmp, DIM=1, MASK = (tmp < cutoff))
+            f_ct = MINLOC(tmp, DIM=1, MASK=(tmp >= cutoff)) + 1
             ! Move the angles array
             crossSec%cdf(i)%angles = tmp(1:f_ct)
             crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
