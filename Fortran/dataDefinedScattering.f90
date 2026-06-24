@@ -108,7 +108,7 @@ MODULE dataDefinedScattering
         CHARACTER(LEN=50), INTENT(IN) :: file
         TYPE(crossSection2D), INTENT(INOUT) :: crossSec
         CHARACTER(LEN=80) :: fullpath
-        REAL(KIND=REAL64) :: cutoff
+        REAL(KIND=REAL64), INTENT(IN) :: cutoff
         REAL(KIND=REAL64) :: interp
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, tmp
         INTEGER :: i, unit, err, ct, a_ct, f_ct
@@ -147,6 +147,9 @@ MODULE dataDefinedScattering
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
             interp = (cutoff - tmp(f_ct - 1)) / (tmp(f_ct) - tmp(f_ct -1))
             crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct - 1)
+
+            ! Re-normalise CDF so that last value is 1
+            crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
         END DO
         PRINT*, energies
         DO i = 1, ct
