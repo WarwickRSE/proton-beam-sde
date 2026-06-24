@@ -29,8 +29,7 @@ MODULE dataDefinedScattering
 
     INTERFACE fillCrossSections
       MODULE PROCEDURE fillCrossSections1D
-      MODULE PROCEDURE fillCrossSections1DRuth
-      MODULE PROCEDURE fillCrossSections2DRuth
+      MODULE PROCEDURE fillCrossSectionsRuth
     END INTERFACE
 
     CONTAINS
@@ -48,15 +47,11 @@ MODULE dataDefinedScattering
             file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
             CALL fillCrossSections(file, NE_crossSections(i))
         END DO
-!        ALLOCATE(RU_crossSections(SIZE(names)))
-!        DO i = 1, SIZE(names)
-!            file = ADJUSTL(TRIM(names(i)))//"_el_ruth_cross_sec.txt"
-!            CALL fillCrossSections(file, RU_crossSections(i), ru_cutoff)
-!        END DO
+        ALLOCATE(RU_crossSections(SIZE(names)))
         ALLOCATE(RU_angle_cdf(SIZE(names)))
         DO i = 1, SIZE(names)
             file = ADJUSTL(TRIM(names(i)))//"_el_ruth_cross_sec.txt"
-            CALL fillCrossSections(file, RU_angle_cdf(i), ru_cutoff)
+            CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff)
         END DO
 
     END SUBROUTINE
@@ -84,7 +79,6 @@ MODULE dataDefinedScattering
         ! Header row
         READ(unit, *) energies
         READ(unit, *) values
-        PRINT*, energies, values
 
         CALL MOVE_ALLOC(energies, crossSec%energies)
         CALL MOVE_ALLOC(values, crossSec%values)
@@ -94,19 +88,11 @@ MODULE dataDefinedScattering
 
     END SUBROUTINE
 
-    !> \brief Helper - read a 1-D Rutherford section
-    SUBROUTINE fillCrossSections1DRuth(file, crossSec, cutoff)
-        ! Stash the needful when reading the full 2D and dont re-read the files for this
-        CHARACTER(LEN=50), INTENT(IN) :: file
-        TYPE(crossSection1D), INTENT(INOUT) :: crossSec
-        CHARACTER(LEN=80) :: fullpath
-        REAL(KIND=REAL64) :: cutoff
-    END SUBROUTINE
-
-    !> \brief Helper - read the 2-D Rutherford section
-    SUBROUTINE fillCrossSections2DRuth(file, crossSec, cutoff)
+    !> \brief Helper - read the Rutherford sections - both the 2D and the 1D in a single read
+    SUBROUTINE fillCrossSectionsRuth(file, crossSec, crossSec1D, cutoff)
         CHARACTER(LEN=50), INTENT(IN) :: file
         TYPE(crossSection2D), INTENT(INOUT) :: crossSec
+        TYPE(crossSection1D), INTENT(INOUT) :: crossSec1D
         CHARACTER(LEN=80) :: fullpath
         REAL(KIND=REAL64), INTENT(IN) :: cutoff
         REAL(KIND=REAL64) :: interp
@@ -128,8 +114,12 @@ MODULE dataDefinedScattering
         ! Header row
         READ(unit, *) energies
 
+        ! Allocation
+        crossSec1D%energies = energies
+        ALLOCATE(crossSec1D%values(SIZE(energies)))
+        CALL MOVE_ALLOC(energies, crossSec%energies)
+
         DO i = 1, ct
-            PRINT*, i
             ! For each row:
             ! Read the angles
             READ(unit, *, IOSTAT=err) tmp
@@ -149,21 +139,22 @@ MODULE dataDefinedScattering
             interp = (cutoff - tmp(f_ct - 1)) / (tmp(f_ct) - tmp(f_ct -1))
             crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct - 1) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct)
 
+            ! Making a copy for the 1D X-section
+            crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct)
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
         END DO
-        PRINT*, energies
-        DO i = 1, ct
-            print*, minVAL(crossSec%cdf(i)%angles), maxval(crossSec%cdf(i)%angles)
-        end do
-
-        CALL MOVE_ALLOC(energies, crossSec%energies)
-        crossSec%ready = .TRUE.
         
+        !DO i = 1, ct
+        !    print*, minVAL(crossSec%cdf(i)%angles), maxval(crossSec%cdf(i)%angles)
+        !end do
+
+        crossSec%ready = .TRUE.
+        crossSec1D%ready = .TRUE.
+
         CLOSE(unit)
 
     END SUBROUTINE
-
 
 
 END MODULE
