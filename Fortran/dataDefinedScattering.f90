@@ -24,12 +24,17 @@ MODULE dataDefinedScattering
     END TYPE
 
     ! Associative arrays, index will be ATOMIC number
+    CHARACTER(LEN=30), DIMENSION(:), ALLOCATABLE :: atom_names
     TYPE(crossSection1D), DIMENSION(:), ALLOCATABLE :: NE_crossSections, RU_crossSections
     TYPE(crossSection2D), DIMENSION(:), ALLOCATABLE :: RU_angle_cdf
 
     INTERFACE fillCrossSections
       MODULE PROCEDURE fillCrossSections1D
       MODULE PROCEDURE fillCrossSectionsRuth
+    END INTERFACE
+
+    INTERFACE evaluate
+      MODULE PROCEDURE evaluate1DCrossSection
     END INTERFACE
 
     CONTAINS
@@ -41,6 +46,8 @@ MODULE dataDefinedScattering
         REAL(KIND=REAL64) :: ru_cutoff
         CHARACTER(LEN=50) :: file
         INTEGER :: i
+
+        atom_names = names
 
         ALLOCATE(NE_crossSections(SIZE(names)))
         DO i = 1, SIZE(names)
@@ -56,6 +63,15 @@ MODULE dataDefinedScattering
 
     END SUBROUTINE
 
+    FUNCTION getNECrossSection(name) RESULT(X)
+        CHARACTER(LEN=30) :: name
+        TYPE(crossSection1D) :: X
+        INTEGER :: ind
+
+        ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+
+        X = NE_crossSections(ind)
+    END FUNCTION
 
     !> \brief Helper - read a 1-D section
     SUBROUTINE fillCrossSections1D(file, crossSec)
@@ -156,5 +172,38 @@ MODULE dataDefinedScattering
 
     END SUBROUTINE
 
+
+    PURE FUNCTION evaluate1DCrossSection(crossSection, energy) RESULT(val)
+        TYPE(crossSection1D), INTENT(IN) :: crossSection
+        REAL(KIND=REAL64), INTENT(IN) :: energy
+        REAL(KIND=REAL64) :: val
+        REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
+        INTEGER :: ct, ind
+    
+        IF(crossSection%ready) THEN
+            ct = SIZE(crossSection%energies)
+            IF(energy < crossSection%energies(1)) THEN
+                val = crossSection%values(1) ! Best guess - the lowest value
+            ELSE IF(energy > crossSection%energies(ct)) THEN
+                val = crossSection%values(ct)
+            ELSE
+                ! Location of first energy which exceeds target
+                ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies > energy))
+                ! TODO can ind == 1 here?
+                ! Interpolate if energies are not too close together
+                ! TODO - better to soften the division ?
+                IF(crossSection%energies(ind) - crossSection%energies(ind-1) > tol) THEN
+                  val = ((crossSection%energies(ind) - energy) * crossSection%values(ind-1) + &
+                      (energy - crossSection%energies(ind-1)) * crossSection%values(ind))/ &
+                      (crossSection%energies(ind) - crossSection%energies(ind-1))
+                ELSE
+                  val = crossSection%values(ind)
+                END IF
+            END IF
+        ELSE
+            ERROR STOP "Trying to evaluate an unpopulated or empty cross section"
+        ENDIF
+    
+    END FUNCTION
 
 END MODULE
