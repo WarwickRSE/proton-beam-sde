@@ -145,8 +145,9 @@ MODULE dataDefinedScattering
             READ(unit, *) crossSec%cdf(i)%values
 
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
+            ! TODO double check interpolation
             interp = (cutoff - tmp(f_ct - 1)) / (tmp(f_ct) - tmp(f_ct -1))
-            crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct - 1)
+            crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct - 1) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct)
 
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
