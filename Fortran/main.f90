@@ -6,5 +6,8 @@ PROGRAM main
 
     ! main exists just to force compilation
 
-    CALL defineCrossSections([character(len=30) :: "carbon", "argon"])
+    ! SKIPPING hydrogen for now
+    ![character(len=30) :: "argon", "calcium", "carbon", "chlorine", "fluorine", "nitrogen", "oxygen", "phosphorus", "potassium", "sodium", "sulfur"]
+    !argon, chlorine, potassium have one line too few in the Rutherford files
+    CALL defineCrossSections([character(len=30) :: "calcium", "carbon", "fluorine", "nitrogen", "oxygen", "phosphorus", "sodium", "sulfur"], 0.04_REAL64)
 END PROGRAM

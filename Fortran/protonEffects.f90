@@ -1,6 +1,6 @@
 MODULE protonEffects
 
-    USE largeAngle
+    USE dataDefinedScattering
 
     CONTAINS
 
