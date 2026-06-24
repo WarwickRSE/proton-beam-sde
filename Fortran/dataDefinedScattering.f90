@@ -4,6 +4,14 @@ MODULE dataDefinedScattering
 
     CHARACTER(LEN=50), PARAMETER :: datadir = "../Splines/" ! Temporary
 
+    TYPE randomGen
+    ! This exists just to flag where random numbers are needed here
+    END TYPE
+    TYPE randomVal
+      REAL(KIND=REAL64) :: v
+    ! DItto
+    END TYPE
+
     TYPE crossSection1D
         LOGICAL :: ready = .FALSE. ! Debug/development 
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
@@ -80,6 +88,15 @@ MODULE dataDefinedScattering
         ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
 
         X = RU_crossSections(ind)
+    END FUNCTION
+    FUNCTION getRU2DCrossSection(name) RESULT(X)
+        CHARACTER(LEN=30) :: name
+        TYPE(crossSection2D) :: X
+        INTEGER :: ind
+
+        ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+
+        X = RU_angle_cdf(ind)
     END FUNCTION
 
     !> \brief Helper - read a 1-D section
@@ -213,6 +230,66 @@ MODULE dataDefinedScattering
             ERROR STOP "Trying to evaluate an unpopulated or empty cross section"
         ENDIF
     
+    END FUNCTION
+
+    PURE FUNCTION sampleAtEnergy(cdf, u) RESULT(val)
+        TYPE(cdfRow), INTENT(IN) :: cdf
+        REAL(KIND=REAL64), INTENT(IN) :: u
+        REAL(KIND=REAL64) :: val, diff
+        REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
+        INTEGER :: ct, ind
+ 
+        ct = SIZE(cdf%angles)
+        IF(u < cdf%values(1)) THEN
+            val = cdf%angles(1)
+        ELSE IF(u > cdf%values(ct)) THEN
+            val = cdf%angles(ct)
+        ELSE
+            ! Location of first value which exceeds target
+            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values > u))
+            ! Interpolate if values are not too close together
+            ! TODO - better to soften the division ?
+            IF(cdf%values(ind) - cdf%values(ind-1) > tol) THEN
+              diff = (u - cdf%values(ind-1)) / &
+                (cdf%values(ind) - cdf%values(ind-1))
+              val = cdf%angles(ind) * diff + &
+                cdf%angles(ind-1) * (1.0_REAL64 - diff)
+            ELSE
+              val = cdf%angles(ind)
+            END IF
+        END IF
+    END FUNCTION
+
+    PURE FUNCTION sample(crossSection, energy, val) RESULT(angle)
+        TYPE(crossSection2D), INTENT(IN) :: crossSection
+        REAL(KIND=REAL64), INTENT(IN) :: energy
+        TYPE(randomVal), VALUE :: val
+        REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
+        REAL(KIND=REAL64) :: angle, tmp_angle, diff
+        INTEGER :: sz, ind
+
+        val%v = 0.37  ! TODO - fake value
+
+        sz = SIZE(crossSection%energies)
+        IF(energy <= crossSection%energies(1)) THEN
+            ! Use lowest energy strand
+            angle = sampleAtEnergy(crossSection%cdf(1), val%v)
+        ELSE IF(energy >= crossSection%energies(sz)) THEN
+            ! Highest energy strand
+            angle = sampleAtEnergy(crossSection%cdf(sz), val%v)
+        ELSE
+            ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies > energy))
+            ! Do angle at ind
+            angle = sampleAtEnergy(crossSection%cdf(ind), val%v)
+            IF((crossSection%energies(ind) - crossSection%energies(ind-1)) > tol) THEN
+                ! If needed do one bin lower and interpolate
+                tmp_angle = sampleAtEnergy(crossSection%cdf(ind-1), val%v)
+                diff = (energy - crossSection%energies(ind-1)) / &
+                  (crossSection%energies(ind) - crossSection%energies(ind-1))
+                angle = angle * diff + tmp_angle * (1.0_REAL64 - diff)
+            END IF
+        END IF
+
     END FUNCTION
 
 END MODULE
