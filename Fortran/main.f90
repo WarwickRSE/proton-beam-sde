@@ -6,5 +6,5 @@ PROGRAM main
 
     ! main exists just to force compilation
 
-    CALL defineCrossSections(["carbon"])
+    CALL defineCrossSections([character(len=30) :: "carbon", "argon"])
 END PROGRAM

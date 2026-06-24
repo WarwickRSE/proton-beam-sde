@@ -17,23 +17,24 @@ MODULE largeAngle
     SUBROUTINE defineCrossSections(names)
         ! Read data for all necessary materials
         CHARACTER(LEN=30), DIMENSION(:) :: names
+        CHARACTER(LEN=30) :: file
         INTEGER :: i
 
         ALLOCATE(lA_crossSections(SIZE(names)))
         DO i = 1, SIZE(names)
-            CALL fillCrossSections(names(i), i)
+            file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
+            CALL fillCrossSections(file, lA_crossSections(i))
         END DO
     END SUBROUTINE
 
-    SUBROUTINE fillCrossSections(name, mat_num)
-        CHARACTER(LEN=30), INTENT(IN) :: name
-        INTEGER, INTENT(IN) :: mat_num
-        CHARACTER(LEN=50) :: path, fullpath
+    SUBROUTINE fillCrossSections(file, crossSec)
+        CHARACTER(LEN=30), INTENT(IN) :: file
+        TYPE(crossSectionFromData), INTENT(INOUT) :: crossSec
+        CHARACTER(LEN=50) :: fullpath
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
         INTEGER :: unit, err, ct
 
-        path = "carbon_ne_rate.txt"
-        fullpath = TRIM(datadir)//ADJUSTL(TRIM(path))
+        fullpath = TRIM(datadir)//ADJUSTL(TRIM(file))
         OPEN(newunit=unit, FILE=fullpath, ACTION="READ", IOSTAT=err)
 
         IF(err /= 0) THEN
@@ -49,8 +50,9 @@ MODULE largeAngle
         READ(unit, *) values
         PRINT*, energies, values
 
-        CALL MOVE_ALLOC(energies, lA_crossSections(mat_num)%energies)
-        CALL MOVE_ALLOC(values, lA_crossSections(mat_num)%values)
+        CALL MOVE_ALLOC(energies, crossSec%energies)
+        CALL MOVE_ALLOC(values, crossSec%values)
+        crossSec%ready = .TRUE.
         
         CLOSE(unit)
 
