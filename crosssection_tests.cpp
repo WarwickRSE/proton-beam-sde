@@ -33,21 +33,16 @@ int main(int argc, char ** argv){
 */
 
   gsl_rng myGen;
-  myGen.value = 0.1;
+  myGen.prime({0.1, 0.1, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0});
+
   std::cout<<myAtom.el_ruth_angle_cdf.sample(100.0, &myGen)<<std::endl;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(73.0, &myGen)<<std::endl;
-  myGen.value = 0.5;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(5.3, &myGen)<<std::endl;
 
-  myGen.value = 0.0;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(1.0, &myGen)<<std::endl;
-  myGen.value = 1.0;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(1.0, &myGen)<<std::endl;
 
-  myGen.value = 0.0;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(160.0, &myGen)<<std::endl;
-  myGen.value = 1.0;
   std::cout<<myAtom.el_ruth_angle_cdf.sample(160.0, &myGen)<<std::endl;
-
 
 }
