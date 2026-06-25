@@ -28,11 +28,6 @@ MODULE protonEffects
                 (LOG(2.0_REAL64 * mecsq * betasq / (material%mee * (1.0_REAL64 - betasq))) - betasq) / &
                 (betasq * material%nucs(i)%A) ! MeV/cm
       END DO
-!    for (unsigned int i = 0; i < at.size(); i++) {
-!      ret += x[i] * 0.3072 * at[i].z * density *
-!             (log(2 * mecsq * betasq / (I * (1 - betasq))) - betasq) /
-!             (betasq * at[i].a); // MeV / cm
-
     END FUNCTION
 
     PURE FUNCTION nonelastic_rate(material, energy) RESULT(rate)
@@ -65,13 +60,5 @@ MODULE protonEffects
       END DO
       rate = rate * EXP(LOG(material%density) + log_avogadro - LOG(a) + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
-
-    !for (unsigned int i = 0; i < at.size(); i++) {
-    !  a += x[i] * at[i].a; // average molar mass
-    !  ret += x[i] * at[i].el_ruth_rate.evaluate(e);
-    !}
-    !double log_molecule_density =
-    !    log(density) + log_avogadro - log(a); // molecules / cm^3
-    !ret *= exp(log_barns_to_cmsq + log_molecule_density);
 
 END MODULE
