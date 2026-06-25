@@ -8,6 +8,8 @@ MODULE MaterialFake
     INTEGER :: Z    ! Atomic number
     REAL(KIND=REAL64) :: A    ! Atomic weight
     REAL(KIND=REAL64) :: massFraction !
+
+    INTEGER :: xsec_ind
   END TYPE
   TYPE cp_material
     INTEGER :: no_nucs=0                ! Number of Nuclides

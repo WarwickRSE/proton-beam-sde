@@ -71,6 +71,13 @@ MODULE dataDefinedScattering
 
     END SUBROUTINE
 
+    FUNCTION getCrossSectionIndex(name) RESULT(ind)
+        CHARACTER(LEN=30) :: name
+        INTEGER :: ind
+
+        ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+    END FUNCTION
+
     FUNCTION getNECrossSection(name) RESULT(X)
         CHARACTER(LEN=30) :: name
         TYPE(crossSection1D) :: X
