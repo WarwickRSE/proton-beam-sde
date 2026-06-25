@@ -1,0 +1,13 @@
+
+CFLAGS= -I./  -Wall -Wextra -O3 --no-inline -g
+LDFLAGS= -lgslcblas -lconfig++
+TESTFLAGS=
+CC = g++
+
+main: simulate.cc
+	${CC} ${CFLAGS} -o simulate simulate.cc ${LDFLAGS}
+
+test: crosssection_tests.cpp
+	${CC} ${CFLAGS} -o test crosssection_tests.cpp ${TESTFLAGS}
+
+
