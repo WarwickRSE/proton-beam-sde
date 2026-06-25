@@ -242,11 +242,11 @@ MODULE dataDefinedScattering
         ct = SIZE(cdf%angles)
         IF(u < cdf%values(1)) THEN
             val = cdf%angles(1)
-        ELSE IF(u > cdf%values(ct)) THEN
+        ELSE IF(u >= cdf%values(ct)) THEN
             val = cdf%angles(ct)
         ELSE
             ! Location of first value which exceeds target
-            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values > u))
+            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values >= u))
             ! Interpolate if values are not too close together
             ! TODO - better to soften the division ?
             IF(cdf%values(ind) - cdf%values(ind-1) > tol) THEN
@@ -260,15 +260,13 @@ MODULE dataDefinedScattering
         END IF
     END FUNCTION
 
-    PURE FUNCTION sample(crossSection, energy, val) RESULT(angle)
+    PURE FUNCTION sampleAngleFromSection(crossSection, energy, val) RESULT(angle)
         TYPE(crossSection2D), INTENT(IN) :: crossSection
         REAL(KIND=REAL64), INTENT(IN) :: energy
         TYPE(randomVal), VALUE :: val
         REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
         REAL(KIND=REAL64) :: angle, tmp_angle, diff
         INTEGER :: sz, ind
-
-        val%v = 0.37  ! TODO - fake value
 
         sz = SIZE(crossSection%energies)
         IF(energy <= crossSection%energies(1)) THEN
