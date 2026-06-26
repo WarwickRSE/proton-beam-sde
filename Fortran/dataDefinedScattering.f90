@@ -3,6 +3,7 @@ MODULE dataDefinedScattering
     IMPLICIT NONE
 
     CHARACTER(LEN=50), PARAMETER :: datadir = "../Splines/" ! Temporary
+    REAL(KIND=REAL64), PARAMETER :: pi = 3.14159265_REAL64
 
     TYPE randomGen
     ! This exists just to flag where random numbers are needed here
@@ -39,6 +40,7 @@ MODULE dataDefinedScattering
     INTERFACE fillCrossSections
       MODULE PROCEDURE fillCrossSections1D
       MODULE PROCEDURE fillCrossSectionsRuth
+      MODULE PROCEDURE fillCrossSectionsHydrogen
     END INTERFACE
 
     INTERFACE evaluate
@@ -59,14 +61,20 @@ MODULE dataDefinedScattering
 
         ALLOCATE(NE_crossSections(SIZE(names)))
         DO i = 1, SIZE(names)
-            file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
-            CALL fillCrossSections(file, NE_crossSections(i))
+            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
+              file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
+              CALL fillCrossSections(file, NE_crossSections(i))
+            END IF
         END DO
         ALLOCATE(RU_crossSections(SIZE(names)))
         ALLOCATE(RU_angle_cdf(SIZE(names)))
         DO i = 1, SIZE(names)
             file = ADJUSTL(TRIM(names(i)))//"_el_ruth_cross_sec.txt"
-            CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff)
+            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
+              CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff)
+            ELSE
+              CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff, bs_cutoff)
+            END IF
         END DO
 
     END SUBROUTINE
@@ -204,6 +212,104 @@ MODULE dataDefinedScattering
         CLOSE(unit)
 
     END SUBROUTINE
+
+    PURE FUNCTION hydrogen_cm_to_lab(ang, En) RESULT(out)
+        REAL(KIND=REAL64), VALUE :: ang, En
+        REAL(KIND=REAL64) :: out
+        REAL(KIND=REAL64), PARAMETER :: mp = 938.346
+        REAL(KIND=REAL64) :: p, u, g, e, v_ratio
+    
+        ang = pi - ang
+        p = SQRT(en * (En + 2 * mp))
+        u = p / (En + 2 * mp)
+        g = 1 / SQRT(1 - u * u)
+        e = En + mp
+        v_ratio = u * (e - u * p) / (p - u * e)
+        if (ABS(g * (cos(ang) + v_ratio)) == 0) THEN
+            out = PI / 2
+        else
+           out = atan(sin(ang) / (g * (cos(ang) + v_ratio)))
+        END IF
+        if (out < 0) THEN
+        out = out +  PI
+        END IF
+    END FUNCTION
+
+    !> \brief Helper - read the Rutherford sections - both the 2D and the 1D in a single read - but for Hydrogen
+    SUBROUTINE fillCrossSectionsHydrogen(file, crossSec, crossSec1D, cutoff, bs_cutoff)
+        CHARACTER(LEN=50), INTENT(IN) :: file
+        TYPE(crossSection2D), INTENT(INOUT) :: crossSec
+        TYPE(crossSection1D), INTENT(INOUT) :: crossSec1D
+        CHARACTER(LEN=80) :: fullpath
+        REAL(KIND=REAL64), INTENT(IN) :: cutoff, bs_cutoff
+        REAL(KIND=REAL64) :: interp, lab_ang_cutoff
+        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, tmp
+        INTEGER :: i, unit, err, ct, a_ct, f_ct, b_ct
+
+        fullpath = TRIM(datadir)//ADJUSTL(TRIM(file))
+        OPEN(newunit=unit, FILE=fullpath, ACTION="READ", IOSTAT=err)
+
+        IF(err /= 0) THEN
+            PRINT*, "Error opening File "//TRIM(fullpath)
+            ERROR STOP
+        END IF
+        !Suggest starting each file with the (line length) count - its a lot easier
+        READ(unit, *) ct, a_ct
+        ! Read the pre-prepared data files by material name/number ?
+        ALLOCATE(energies(ct), crossSec%cdf(ct), tmp(a_ct))
+
+        ! Header row
+        READ(unit, *) energies
+
+        ! Allocation
+        crossSec1D%energies = energies
+        ALLOCATE(crossSec1D%values(SIZE(energies)))
+        CALL MOVE_ALLOC(energies, crossSec%energies)
+
+        DO i = 1, ct
+            ! For each row:
+            ! Transform the cutoff
+            lab_ang_cutoff = hydrogen_cm_to_lab(bs_cutoff, crossSec%energies(i))
+            ! Read the angles
+            READ(unit, *, IOSTAT=err) tmp
+            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(fullpath)
+            ! Find cutoff index
+            ! TODO - check for off-by-one
+            f_ct = MINLOC(tmp, DIM=1, MASK=(tmp > cutoff))
+            b_ct = MINLOC(tmp, DIM=1, MASK=(tmp > lab_ang_cutoff))
+            IF(b_ct > f_ct) ERROR STOP "I don't think the cutoffs can be this way round"
+            ! Move the angles array
+            crossSec%cdf(i)%angles = tmp(b_ct:f_ct)
+   !         PRINT*, b_ct, f_ct, f_ct-b_ct, SIZE(tmp(b_ct:f_ct))
+            crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
+            ! Allocate and read the cdf row including one value past the cutoff
+            !ALLOCATE(crossSec%cdf(i)%values(f_ct-b_ct))
+            READ(unit, *) tmp(1:f_ct)
+            crossSec%cdf(i)%values = tmp(b_ct:f_ct)
+
+            ! f_ct is the size from here on
+            f_ct = f_ct - b_ct + 1
+            ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
+            interp = (cutoff - crossSec%cdf(i)%angles(f_ct - 1)) / (crossSec%cdf(i)%angles(f_ct) - crossSec%cdf(i)%angles(f_ct -1))
+            crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct-1)
+
+            ! Making a copy for the 1D X-section
+            crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)
+            ! Re-normalise CDF so that last value is 1
+            crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
+        END DO
+        
+        !DO i = 1, ct
+        !    print*, minVAL(crossSec%cdf(i)%angles), maxval(crossSec%cdf(i)%angles)
+        !end do
+
+        crossSec%ready = .TRUE.
+        crossSec1D%ready = .TRUE.
+
+        CLOSE(unit)
+
+    END SUBROUTINE
+
 
 
     PURE FUNCTION evaluate1DCrossSection(crossSection, energy) RESULT(val)

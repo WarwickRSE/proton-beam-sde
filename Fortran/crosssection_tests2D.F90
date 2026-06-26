@@ -4,7 +4,7 @@ PROGRAM crossSectionTests
     IMPLICIT NONE
 
 
-    CHARACTER(LEN=30) :: name = "carbon" ! "hydrogen"
+    CHARACTER(LEN=30) :: name = "hydrogen"
     REAL(KIND=REAL64) :: val
     TYPE(crossSection2D) :: xsec
 
@@ -62,15 +62,29 @@ Fortran now
 
 hydrogen c++
 
-1.55929
-1.5604
-1.55719
-1.56167
+NOTE: lab_ang_cutoff is about 1.55
+
+1.44996
+1.53925
+1.53162
+1.55071
 0.04
-1.56131
+1.54993
 0.04
-1.55671
-0.619414
+1.37805
+0.540784
+
+Fortran
+
+   1.5502732698094992     
+   1.5504138807854488     
+   1.5507707812916556     
+   1.5507936655375631     
+   4.0000000000000001E-002
+   1.5500154014037679     
+   4.0000000000000001E-002
+   1.5500154014037679     
+  0.61981994317006173   
 
 #endif
 
