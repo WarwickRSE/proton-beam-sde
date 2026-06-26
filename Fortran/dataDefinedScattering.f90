@@ -14,7 +14,7 @@ MODULE dataDefinedScattering
     END TYPE
 
     TYPE crossSection1D
-        LOGICAL :: ready = .FALSE. ! Debug/development 
+        LOGICAL :: used=.TRUE., ready = .FALSE. ! Debug/development
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
     END TYPE
 
@@ -64,6 +64,9 @@ MODULE dataDefinedScattering
             IF(TRIM(names(i)) /= 'hydrogen' ) THEN
               file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
               CALL fillCrossSections(file, NE_crossSections(i))
+            ELSE
+              NE_crossSections(i)%used = .FALSE.
+              NE_crossSections(i)%ready = .TRUE.
             END IF
         END DO
         ALLOCATE(RU_crossSections(SIZE(names)))
@@ -319,7 +322,10 @@ MODULE dataDefinedScattering
         REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
         INTEGER :: ct, ind
     
-        IF(crossSection%ready) THEN
+        IF(.NOT. crossSection%used) THEN
+            ! Valid but not in use - 0 X-Section
+            val = 0.0_REAL64
+        ELSE IF(crossSection%ready) THEN
             ct = SIZE(crossSection%energies)
             IF(energy < crossSection%energies(1)) THEN
                 val = crossSection%values(1) ! Best guess - the lowest value
