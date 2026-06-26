@@ -284,11 +284,11 @@ MODULE dataDefinedScattering
             crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
             ! Allocate and read the cdf row including one value past the cutoff
             !ALLOCATE(crossSec%cdf(i)%values(f_ct-b_ct))
-            READ(unit, *) tmp(1:f_ct)
-            crossSec%cdf(i)%values = tmp(b_ct:f_ct)
+            READ(unit, *) tmp(1:f_ct+1)
+            crossSec%cdf(i)%values = tmp(b_ct:f_ct+1)
 
             ! f_ct is the size from here on
-            f_ct = f_ct - b_ct + 1
+            f_ct = f_ct - b_ct + 2
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
             interp = (cutoff - crossSec%cdf(i)%angles(f_ct - 1)) / (crossSec%cdf(i)%angles(f_ct) - crossSec%cdf(i)%angles(f_ct -1))
             crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct-1)
@@ -296,7 +296,7 @@ MODULE dataDefinedScattering
             ! Making a copy for the 1D X-section
             crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)
             ! Re-normalise CDF so that last value is 1
-            crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
+            crossSec%cdf(i)%values = (crossSec%cdf(i)%values - crossSec%cdf(i)%values(1)) / (crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)) 
         END DO
         
         !DO i = 1, ct
@@ -359,7 +359,7 @@ MODULE dataDefinedScattering
             val = cdf%angles(ct)
         ELSE
             ! Location of first value which exceeds target
-            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values > u))
+            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values >= u))
             ! Interpolate if values are not too close together
             ! NOTE: interpolate the angle based on the cdf spacing
             ! TODO - better to soften the division ?
@@ -386,11 +386,11 @@ MODULE dataDefinedScattering
         IF(energy <= crossSection%energies(1)) THEN
             ! Use lowest energy strand
             angle = sampleAtEnergy(crossSection%cdf(1), val%v)
-        ELSE IF(energy >= crossSection%energies(sz)) THEN
+        ELSE IF(energy > crossSection%energies(sz)) THEN
             ! Highest energy strand
             angle = sampleAtEnergy(crossSection%cdf(sz), val%v)
         ELSE
-            ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies > energy))
+            ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies >= energy))
             ! Do angle at ind
             angle = sampleAtEnergy(crossSection%cdf(ind), val%v)
             IF((crossSection%energies(ind) - crossSection%energies(ind-1)) > tol) THEN
