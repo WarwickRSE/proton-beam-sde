@@ -9,8 +9,8 @@ PROGRAM crossSectionTests
     TYPE(crossSection1D) :: xsec
 
     CALL defineCrossSections([name], 0.04_REAL64, 0.0_REAL64)
-    xsec = getNECrossSection(name)
-    !xsec = getRUCrossSection(name)
+    !xsec = getNECrossSection(name)
+    xsec = getRUCrossSection(name)
 
     val = evaluate(xsec, 100.0_REAL64)
     PRINT*, val
@@ -40,6 +40,13 @@ Fortran
    51.937851797007539     
    1466.1996235474701     
   0.13480769369545301 
+CORRECTED Fortran
+  0.28820004297554463     
+  0.50198180187412156     
+   52.031999119473987     
+   1470.7285436663133     
+  0.13458716353250083   
+
 
 NE c++
 0.227

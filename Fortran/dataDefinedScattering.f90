@@ -48,10 +48,10 @@ MODULE dataDefinedScattering
     CONTAINS
 
     !> \brief Populate the cross section data from files
-    SUBROUTINE defineCrossSections(names, ru_cutoff)
+    SUBROUTINE defineCrossSections(names, ru_cutoff, bs_cutoff)
         ! Read data for all necessary materials
         CHARACTER(LEN=30), DIMENSION(:), INTENT(IN) :: names
-        REAL(KIND=REAL64) :: ru_cutoff
+        REAL(KIND=REAL64), INTENT(IN) :: ru_cutoff, bs_cutoff
         CHARACTER(LEN=50) :: file
         INTEGER :: i
 
@@ -186,7 +186,7 @@ MODULE dataDefinedScattering
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
             ! TODO double check interpolation
             interp = (cutoff - tmp(f_ct - 1)) / (tmp(f_ct) - tmp(f_ct -1))
-            crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct - 1) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct)
+            crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct-1)
 
             ! Making a copy for the 1D X-section
             crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct)
@@ -247,14 +247,15 @@ MODULE dataDefinedScattering
         INTEGER :: ct, ind
  
         ct = SIZE(cdf%angles)
-        IF(u < cdf%values(1)) THEN
+        IF(u <= cdf%values(1)) THEN
             val = cdf%angles(1)
         ELSE IF(u >= cdf%values(ct)) THEN
             val = cdf%angles(ct)
         ELSE
             ! Location of first value which exceeds target
-            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values >= u))
+            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values > u))
             ! Interpolate if values are not too close together
+            ! NOTE: interpolate the angle based on the cdf spacing
             ! TODO - better to soften the division ?
             IF(cdf%values(ind) - cdf%values(ind-1) > tol) THEN
               diff = (u - cdf%values(ind-1)) / &

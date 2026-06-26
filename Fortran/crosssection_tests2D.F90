@@ -4,11 +4,11 @@ PROGRAM crossSectionTests
     IMPLICIT NONE
 
 
-    CHARACTER(LEN=30) :: name = "carbon"
+    CHARACTER(LEN=30) :: name = "carbon" ! "hydrogen"
     REAL(KIND=REAL64) :: val
     TYPE(crossSection2D) :: xsec
 
-    CALL defineCrossSections([name], 0.04_REAL64)
+    CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64)
     xsec = getRU2DCrossSection(name)
 
     val = sampleAngleFromSection(xsec, 100.0_REAL64, randomVal(0.1_REAL64))
@@ -35,6 +35,8 @@ PROGRAM crossSectionTests
     PRINT*, val
 
 #ifdef undef
+
+carbon
 c++
 0.349714
 0.395738
@@ -48,15 +50,28 @@ c++
 
 Fortran now
 
-  0.34979011233748014     
-  0.39575874285697199     
-   5.6362699557183399E-002
+  0.34971414586013017     
+  0.39573750571348182     
+   5.6312822623283409E-002
    3.1415926535897931     
    4.0000000000000001E-002
    3.1415926535897931     
    4.0000000000000001E-002
-  0.27606350020288201     
-   7.5981097636682760E-002
+  0.27618468284961678     
+   7.6311936705110564E-002
+
+hydrogen c++
+
+1.55929
+1.5604
+1.55719
+1.56167
+0.04
+1.56131
+0.04
+1.55671
+0.619414
+
 #endif
 
 END PROGRAM
