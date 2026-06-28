@@ -8,6 +8,12 @@ MODULE randomMod
       INTEGER :: x = 123456789, y = 362436069, z = 521288629, w = 916191069
     END TYPE
 
+    TYPE :: BoxMullerRNGState
+      TYPE(KissRNGState) :: k_state
+      LOGICAL :: has_cache
+      REAL(KIND=REAL64) :: cached_value
+    END TYPE BoxMullerRNGState
+
     ABSTRACT INTERFACE
      FUNCTION pdf(x) result(res)
        IMPORT REAL64
@@ -56,7 +62,7 @@ MODULE randomMod
     TYPE(KissRNGState), INTENT(INOUT) :: state
     INTEGER, INTENT(IN) :: seed
     INTEGER :: i
-    DOUBLE PRECISION :: dummy
+    REAL(KIND=REAL64) :: dummy
 
     state%x = state%x + seed
     state%y = state%y + seed
@@ -97,5 +103,41 @@ MODULE randomMod
 
   END FUNCTION
 
+  ! Polar Box_muller
+  ! Generates 2 random values per use, so caches the second for the next call
+  FUNCTION random_box_muller(stdev, state) RESULT(val)
+
+    REAL(KIND=REAL64), INTENT(IN) :: stdev
+    TYPE(BoxMullerRNGState), INTENT(INOUT) :: state
+    REAL(KIND=REAL64) :: val
+
+    REAL(KIND=REAL64) :: rand1, rand2, w
+    REAL(KIND=REAL64), PARAMETER :: c_tiny = TINY(1.0_REAL64)
+
+    IF (state%has_cache) THEN
+      state%has_cache = .FALSE.
+      val = state%cached_value * stdev
+    ELSE
+      state%has_cache = .TRUE.
+
+      DO
+        rand1 = random(state%k_state)
+        rand2 = random(state%k_state)
+
+        rand1 = 2.0_REAL64 * rand1 - 1.0_REAL64
+        rand2 = 2.0_REAL64 * rand2 - 1.0_REAL64
+
+        w = rand1**2 + rand2**2
+
+        IF (w > c_tiny .AND. w < 1.0_REAL64) EXIT
+      END DO
+
+      w = SQRT((-2.0_REAL64 * LOG(w)) / w)
+
+      val = rand1 * w * stdev
+      state%cached_value = rand2 * w
+    END IF
+
+  END FUNCTION random_box_muller
 
 END MODULE

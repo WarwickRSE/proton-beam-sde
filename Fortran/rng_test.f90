@@ -3,6 +3,7 @@ PROGRAM main
     USE randomMod
 
     TYPE(KissRNGState) :: state
+    TYPE(BoxMullerRNGState) :: b_state
     INTEGER :: i
 
 
@@ -11,8 +12,13 @@ PROGRAM main
        WRITE(10, *) random(state)
     END DO
 
-    DO i = 1, 10000
+    DO i = 1, 1000
        WRITE(20, *) rejection_sample(state, tophat)
+    END DO
+
+    b_state%k_state = state
+    DO i = 1, 1000
+       WRITE(30, *) random_box_muller(0.5_REAL64, b_state)
     END DO
 
 
