@@ -1,0 +1,81 @@
+# Description
+
+This is a few of the things that might not come up in basic Fortran that are used in this code
+
+# Case, scope etc
+
+Fortran is NOT case sensitive. N and n are the same variable. Like most languages, a local variable can shadow a module or global one. 
+
+# Intents
+
+- IN: can be read from, but not written (enforced by compiler)
+- OUT: can be written, but value on entry not used (matters for Allocatable arrays)
+- INOUT: can be read from and written. As it can be written, cannot bind to a literal
+- Not specified: no compiler checks performed, binds anything
+
+The analog for a C++ pass-by-value is the 'VALUE' attribute, which turns pass-by-object-reference into pass-by-value i.e. inside the function you have a copy. 
+
+# Types
+
+Analogous to C++ structs (public access default). Properties accessed using '%' (occasionally see '.' which is an Intel extension - not recommended)
+
+# Component selection
+
+Arrays are first class in Fortran, thus one can do e.g. arr = 1.0 to set all values, and arr1 * arr2 to element-wise multiply.  An array of types can be sliced very conveniently like this:
+
+TYPE(position)
+  REAL :: x, y, z
+END TYPE
+
+TYPE(position), DIMENSION(10) :: arr
+
+arr%x -> array of size 10 of the x components only and can take part in expressions like
+
+arr%x = 1.0 or arr%x = arr%x + dx
+
+# Strings
+
+Strings are a bit horrible. It's common to use fixed length, which are filled with blanks to their end. But this means one has to carefully use TRIM when comparing strings.
+
+String literals passed to functions get a bit weird - passing `character(len=30) :: "calcium" ` makes a string length 30 chars, filled with 'calcium'. The bit before :: is a kind of constructor notation, which makes sure that the length is as the function expects and the trailing bit is blanks. If in doubt, store string literals into a variable before passing them. 
+
+# Function result and pure
+
+By default the return value of a function is its name - when this is long and unwieldy there is a 'RESULT' clause one can add to give it a different name. This is especially handy when copying from C++ to avoid renaming the retutn type.
+
+"Pure" as a function modifier means that a function does not have side-effects - it cannot print, or interact with files, it should not access global variable, and it should take all arguments as INTENT(IN) or VALUE so they are not modified. Ideally such functions should be Idempotent, but I don't know offhand if the guarantees are enough to enforce this. 
+
+
+# Interface blocks
+
+This code uses explicit INTERFACE blocks for two reasons - one is to allow the use of several functions with different signatures under a single coherent name. 
+
+The other is to define the type of a function so it can be passed to another - this is an ABSTRACT INTERFACE as it defines only a function signature. 
+
+An odd thing about interface blocks is that they do not inherit variables from outside - do we have to IMPORT things like KIND specifiers. See random.f90 for info
+
+
+# MINLOC
+
+A common action (esp. with the file based potentials) is to find the first location in an array where a condition is true. This can obviously be done with a loop, but it can also be done using Array operations, which might be easier for the compiler to optimise. This idiom is like
+
+ ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+
+ or 
+ ind = MINLOC(tmp, DIM=1, MASK=(tmp > cutoff))
+
+ MASK is where the condition goes: for an array something like "array > value" returns an array of logicals with the elementwise result of the conditional expression. MINLOC considers only elements where MASK is true. 
+
+ DIM is used because by default MINLOC returns an array of length RANK(array) - in these cases an array of length 1. We could unpack this, or specific DIM=1
+
+ # ERROR STOP
+
+ This is the easiest way to print an error message and exit the entire code. Give it a string to print. 
+
+ # Automatic (re)-allocation and move_alloc
+
+ Allocatable arrays are run-time size specified. Since F2003 if you set an unallocated array equal to another array, it will be allocated to the correct size, and filled by copying.
+
+ To suppress this, e.g. to get an error if the two sides don't match, specify the left-hand-side as a slice such as (1:n). 
+
+ MOVE_ALLOC is a short cut to allocate one array, stealing the memory from another. The source becomes de-allocated, the destination becomes allocated. No copy is needed because the backing memory gets transferred. 
