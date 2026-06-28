@@ -77,7 +77,8 @@ MODULE randomMod
   END SUBROUTINE random_warmup
 
   ! Basic rejection sampling from PDF defined as follows
-  ! range is assumed to be [0,1], pdf is assumed normalised
+  ! range is assumed to be [0,1], pdf is assumed normalised to peak at 1
+  ! pdf is assumed to be strictly > 0 else the sampling may loop-out
   FUNCTION rejection_sample(state, pdf_fn) RESULT(val)
 
     TYPE(KissRNGState), INTENT(INOUT) :: state
