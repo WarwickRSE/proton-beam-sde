@@ -21,6 +21,14 @@ MODULE randomMod
        real(KIND=REAL64) :: res
      end function pdf
     END INTERFACE
+    ABSTRACT INTERFACE
+     FUNCTION pdf_2v(x, b) result(res)
+       IMPORT REAL64
+       real(KIND=REAL64), intent(in) :: x
+       INTEGER, INTENT(IN) :: b
+       real(KIND=REAL64) :: res
+     end function pdf_2v
+    END INTERFACE
 
   CONTAINS 
 
@@ -104,6 +112,36 @@ MODULE randomMod
 
   END FUNCTION
 
+  ! Basic rejection sampling from PDF defined as follows
+  ! range is assumed to be [0,1], pdf is assumed normalised to peak at 1
+  ! pdf is assumed to be strictly > 0 else the sampling may loop-out
+  ! alpha is assumed == 1, beta is as given
+  FUNCTION rejection_sample_beta(state, pdf_fn, beta) RESULT(val)
+
+    TYPE(KissRNGState), INTENT(INOUT) :: state
+    PROCEDURE(pdf_2v) :: pdf_fn
+    INTEGER :: beta
+    REAL(KIND=REAL64) :: val
+    REAL(KIND=REAL64) :: x, y
+    INTEGER :: i
+    INTEGER, PARAMETER :: max_it = 1000
+
+    val = 0.0_REAL64
+    DO i = 1, max_it
+      ! Without a better guess, sample uniform in x and y
+      x = random(state)
+      y = random(state)
+        PRINT*, i, x, y, pdf_fn(x, beta)
+      IF(pdf_fn(x, beta) > y) THEN
+        val = x
+        RETURN
+      END IF
+    END DO
+
+    IF(i == max_it) ERROR STOP "Failed to find a valid random sample"
+
+  END FUNCTION
+
   ! Polar Box_muller
   ! Generates 2 random values per use, so caches the second for the next call
   FUNCTION random_box_muller(stdev, state) RESULT(val)
@@ -140,5 +178,22 @@ MODULE randomMod
     END IF
 
   END FUNCTION random_box_muller
+
+  FUNCTION beta_pdf(x, beta)
+    REAL(KIND=REAL64), INTENT(IN) :: x
+    INTEGER, INTENT(IN) :: beta
+    REAL(KIND=REAL64) :: beta_pdf
+  
+    beta_pdf = gamma(1.0 + beta) / gamma(REAL(beta)) * (1.0 - x)**(beta - 1) / REAL(beta)
+  END FUNCTION
+
+  FUNCTION random_beta(state, beta) RESULT(ran)
+    TYPE(KissRNGState), INTENT(INOUT) :: state
+    REAL(KIND=REAL64) :: ran
+    INTEGER :: beta
+
+    ran = rejection_sample_beta(state, beta_pdf, beta)
+
+  END FUNCTION
 
 END MODULE
