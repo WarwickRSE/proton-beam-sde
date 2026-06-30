@@ -179,6 +179,12 @@ MODULE randomMod
 
   END FUNCTION random_box_muller
 
+  PURE FUNCTION beta_fn(a, b)
+    INTEGER, INTENT(IN) :: a, b
+    REAL(KIND=REAL64) :: beta_fn
+    beta_fn = gamma(REAL(a)) * gamma(REAL(b)) / gamma(REAL(a) + REAL(b))
+  END FUNCTION
+  
   FUNCTION beta_pdf(x, beta)
     REAL(KIND=REAL64), INTENT(IN) :: x
     INTEGER, INTENT(IN) :: beta
@@ -192,8 +198,10 @@ MODULE randomMod
     REAL(KIND=REAL64) :: ran
     INTEGER :: beta
 
-    ran = rejection_sample_beta(state, beta_pdf, beta)
-
+    !ran = rejection_sample_beta(state, beta_pdf, beta)
+    ran = beta_fn(1+beta, 1) * (1.0 + beta) * random(state)
+    ran = ran**(1.0/(1.0 + beta))
+    ran = 1.0_REAL64 - ran
   END FUNCTION
 
 END MODULE
