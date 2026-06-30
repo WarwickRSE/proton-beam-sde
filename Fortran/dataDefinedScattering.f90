@@ -288,10 +288,10 @@ MODULE dataDefinedScattering
             ! Allocate and read the cdf row including one value past the cutoff
             !ALLOCATE(crossSec%cdf(i)%values(f_ct-b_ct))
             READ(unit, *) tmp(1:f_ct+1)
-            crossSec%cdf(i)%values = tmp(b_ct:f_ct+1)
+            crossSec%cdf(i)%values = tmp(b_ct:f_ct)
 
             ! f_ct is the size from here on
-            f_ct = f_ct - b_ct + 2
+            f_ct = f_ct - b_ct + 1
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
             interp = (cutoff - crossSec%cdf(i)%angles(f_ct - 1)) / (crossSec%cdf(i)%angles(f_ct) - crossSec%cdf(i)%angles(f_ct -1))
             crossSec%cdf(i)%values(f_ct) = crossSec%cdf(i)%values(f_ct) * interp + (1.0_REAL64 - interp) * crossSec%cdf(i)%values(f_ct-1)
