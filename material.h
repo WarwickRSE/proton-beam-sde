@@ -32,7 +32,7 @@ struct Atom {
     double z_a = z;
     double ret = 15.68 * (a_c - a_a) -
                  28.07 * (pow(n_c - z_c, 2) / a_c - pow(n_a - z_a, 2) / a_a) -
-                 18.56 * (pow(a_c, 2 / 3) - pow(a_a, 2 / 3)) +
+                 18.56 * (pow(a_c, 2.0 / 3) - pow(a_a, 2.0 / 3)) +
                  33.22 * (pow(n_c - z_c, 2) / pow(a_c, 4.0 / 3) -
                           pow(n_a - z_a, 2) / pow(a_a, 4.0 / 3)) -
                  0.717 * (z_c * z_c / pow(a_c, 1.0 / 3) -
@@ -136,7 +136,7 @@ struct Material {
     std::vector<double> chi_a_sq_vec(at.size());
     for (unsigned int i = 0; i < at.size(); i++) {
       chi_c_sq += x[i] * at[i].z * (at[i].z + 1.0) / at[i].a;
-      chi_a_sq_vec[i] = 2.007e-5 * pow(at[i].z, 2 / 3) *
+      chi_a_sq_vec[i] = 2.007e-5 * pow(at[i].z, 2.0 / 3.0) *
                         (1 + 3.34 * pow(at[i].z / (137 * sqrt(betasq)), 2)) /
                         (p * p);
     }
