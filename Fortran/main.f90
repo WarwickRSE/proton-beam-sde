@@ -36,4 +36,7 @@ PROGRAM main
     tmp = rutherford_and_elastic_rate(testMaterial, 1.0_REAL64)
     PRINT*, tmp
 
+    tmp = moliere_scattering_sd(testMaterial, 1.0_REAL64, 1.0_REAL64)
+    PRINT*, tmp
+
 END PROGRAM

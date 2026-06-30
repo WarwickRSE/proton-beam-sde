@@ -108,7 +108,7 @@ MODULE randomMod
       END IF
     END DO
 
-    IF(i == max_it) ERROR STOP "Failed to find a valid random sample"
+    IF(i > max_it) ERROR STOP "Failed to find a valid random sample"
 
   END FUNCTION
 
@@ -138,7 +138,7 @@ MODULE randomMod
       END IF
     END DO
 
-    IF(i == max_it) ERROR STOP "Failed to find a valid random sample"
+    IF(i > max_it) ERROR STOP "Failed to find a valid random sample"
 
   END FUNCTION
 
