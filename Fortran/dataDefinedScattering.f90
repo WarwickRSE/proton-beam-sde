@@ -2,7 +2,6 @@ MODULE dataDefinedScattering
     USE iso_fortran_env, only: real64 ! REPLACE WITH kinds!
     IMPLICIT NONE
 
-    CHARACTER(LEN=50), PARAMETER :: datadir = "../Splines/" ! Temporary
     REAL(KIND=REAL64), PARAMETER :: pi = 3.14159265_REAL64
     INTEGER, PARAMETER :: max_buf = 2**16, max_lines = 2**8
 
@@ -68,43 +67,44 @@ MODULE dataDefinedScattering
     CONTAINS
 
     !> \brief Populate the cross section data from files
-    SUBROUTINE defineCrossSections(names, ru_cutoff, bs_cutoff)
+    SUBROUTINE defineCrossSections(names, ru_cutoff, bs_cutoff, data_path)
         ! Read data for all necessary materials
         CHARACTER(LEN=30), DIMENSION(:), INTENT(IN) :: names
+        CHARACTER(LEN=*), INTENT(IN) :: data_path
         REAL(KIND=REAL64), INTENT(IN) :: ru_cutoff, bs_cutoff
-        CHARACTER(LEN=50) :: file
+        CHARACTER(LEN=132) :: file
         INTEGER :: i
 
         atom_names = names
 
         ALLOCATE(NE_crossSections(SIZE(names)))
         DO i = 1, SIZE(names)
-            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
-              file = ADJUSTL(TRIM(names(i)))//"_ne_rate.txt"
-              CALL fillCrossSections(file, NE_crossSections(i))
-            ELSE
+            IF(TRIM(names(i)) == 'hydrogen' .OR. TRIM(names(i)) == 'h' .OR. TRIM(names(i)) == 'H') THEN
               NE_crossSections(i)%used = .FALSE.
               NE_crossSections(i)%ready = .TRUE.
+            ELSE
+              file = ADJUSTL(TRIM(data_path)//"/"//TRIM(names(i))//"_ne_rate.txt")
+              CALL fillCrossSections(file, NE_crossSections(i))
             END IF
         END DO
         ALLOCATE(RU_crossSections(SIZE(names)))
         ALLOCATE(RU_angle_cdf(SIZE(names)))
         DO i = 1, SIZE(names)
-            file = ADJUSTL(TRIM(names(i)))//"_el_ruth_cross_sec.txt"
-            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
-              CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff)
-            ELSE
+            file = ADJUSTL(TRIM(data_path)//"/"//TRIM(names(i))//"_el_ruth_cross_sec.txt")
+            IF(TRIM(names(i)) == 'hydrogen' .OR. TRIM(names(i)) == 'h' .or. TRIM(names(i)) == 'H') THEN
               CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff, bs_cutoff)
+            ELSE
+              CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff)
             END IF
         END DO
         ALLOCATE(NE_angle_cdf(SIZE(names)))
         DO i = 1, SIZE(names)
-            file = TRIM(datadir)//ADJUSTL(TRIM(names(i)))//"_ne_energyangle_cdf.txt"
-            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
-              CALL fillCrossSections(file, NE_angle_cdf(i))
+            IF(TRIM(names(i)) == 'hydrogen' .OR. TRIM(names(i)) == 'h' .OR. TRIM(names(i)) == 'H') THEN
+              NE_crossSections(i)%used = .FALSE.
+              NE_crossSections(i)%ready = .TRUE.
             ELSE
-              NE_angle_cdf(i)%used = .FALSE.
-              NE_angle_cdf(i)%ready = .TRUE.
+              file = ADJUSTL(TRIM(data_path)//"/"//TRIM(names(i))//"_ne_energyangle_cdf.txt")
+              CALL fillCrossSections(file, NE_angle_cdf(i))
             END IF
         END DO
  
@@ -156,17 +156,15 @@ MODULE dataDefinedScattering
 
     !> \brief Helper - read a 1-D section
     SUBROUTINE fillCrossSections1D(file, crossSec)
-        CHARACTER(LEN=50), INTENT(IN) :: file
+        CHARACTER(LEN=132), INTENT(IN) :: file
         TYPE(crossSection1D), INTENT(INOUT) :: crossSec
-        CHARACTER(LEN=80) :: fullpath
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
         INTEGER :: unit, err, ct
 
-        fullpath = TRIM(datadir)//ADJUSTL(TRIM(file))
-        OPEN(newunit=unit, FILE=fullpath, ACTION="READ", IOSTAT=err)
+        OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
 
         IF(err /= 0) THEN
-            PRINT*, "Error opening File "//TRIM(fullpath)
+            PRINT*, "Error opening File "//TRIM(file)
             ERROR STOP
         END IF
         !Suggest starting each file with the count - its a lot easier
@@ -187,20 +185,18 @@ MODULE dataDefinedScattering
 
     !> \brief Helper - read the Rutherford sections - both the 2D and the 1D in a single read
     SUBROUTINE fillCrossSectionsRuth(file, crossSec, crossSec1D, cutoff)
-        CHARACTER(LEN=50), INTENT(IN) :: file
+        CHARACTER(LEN=132), INTENT(IN) :: file
         TYPE(crossSection2D), INTENT(INOUT) :: crossSec
         TYPE(crossSection1D), INTENT(INOUT) :: crossSec1D
-        CHARACTER(LEN=80) :: fullpath
         REAL(KIND=REAL64), INTENT(IN) :: cutoff
         REAL(KIND=REAL64) :: interp
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, tmp
         INTEGER :: i, unit, err, ct, a_ct, f_ct
 
-        fullpath = TRIM(datadir)//ADJUSTL(TRIM(file))
-        OPEN(newunit=unit, FILE=fullpath, ACTION="READ", IOSTAT=err)
+        OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
 
         IF(err /= 0) THEN
-            PRINT*, "Error opening File "//TRIM(fullpath)
+            PRINT*, "Error opening File "//TRIM(file)
             ERROR STOP
         END IF
         !Suggest starting each file with the (line length) count - its a lot easier
@@ -220,7 +216,7 @@ MODULE dataDefinedScattering
             ! For each row:
             ! Read the angles
             READ(unit, *, IOSTAT=err) tmp
-            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(fullpath)
+            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(file)
             ! Find cutoff index
             ! TODO - check for off-by-one
             f_ct = MINLOC(tmp, DIM=1, MASK=(tmp >= cutoff)) + 1
@@ -229,7 +225,8 @@ MODULE dataDefinedScattering
             crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
             ! Allocate and read the cdf row including one value past the cutoff
             ALLOCATE(crossSec%cdf(i)%values(f_ct))
-            READ(unit, *) crossSec%cdf(i)%values
+            READ(unit, *,IOSTAT=err) crossSec%cdf(i)%values
+            IF(err /= 0) ERROR STOP "second Missing Energy Value in File "//TRIM(file)
 
             ! Correct the cdf value at the last angle (currently just past the cutoff, interpolate back)
             ! TODO double check interpolation
@@ -241,10 +238,6 @@ MODULE dataDefinedScattering
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
         END DO
-        
-        !DO i = 1, ct
-        !    print*, minVAL(crossSec%cdf(i)%angles), maxval(crossSec%cdf(i)%angles)
-        !end do
 
         crossSec%ready = .TRUE.
         crossSec1D%ready = .TRUE.
@@ -277,20 +270,18 @@ MODULE dataDefinedScattering
 
     !> \brief Helper - read the Rutherford sections - both the 2D and the 1D in a single read - but for Hydrogen
     SUBROUTINE fillCrossSectionsHydrogen(file, crossSec, crossSec1D, cutoff, bs_cutoff)
-        CHARACTER(LEN=50), INTENT(IN) :: file
+        CHARACTER(LEN=132), INTENT(IN) :: file
         TYPE(crossSection2D), INTENT(INOUT) :: crossSec
         TYPE(crossSection1D), INTENT(INOUT) :: crossSec1D
-        CHARACTER(LEN=80) :: fullpath
         REAL(KIND=REAL64), INTENT(IN) :: cutoff, bs_cutoff
         REAL(KIND=REAL64) :: interp, lab_ang_cutoff
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, tmp
         INTEGER :: i, unit, err, ct, a_ct, f_ct, b_ct
 
-        fullpath = TRIM(datadir)//ADJUSTL(TRIM(file))
-        OPEN(newunit=unit, FILE=fullpath, ACTION="READ", IOSTAT=err)
+        OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
 
         IF(err /= 0) THEN
-            PRINT*, "Error opening File "//TRIM(fullpath)
+            PRINT*, "Error opening File "//TRIM(file)
             ERROR STOP
         END IF
         !Suggest starting each file with the (line length) count - its a lot easier
@@ -312,7 +303,7 @@ MODULE dataDefinedScattering
             lab_ang_cutoff = hydrogen_cm_to_lab(bs_cutoff, crossSec%energies(i))
             ! Read the angles
             READ(unit, *, IOSTAT=err) tmp
-            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(fullpath)
+            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(file)
             ! Find cutoff index
             ! TODO - check for off-by-one
             f_ct = MINLOC(tmp, DIM=1, MASK=(tmp > cutoff))
@@ -337,10 +328,6 @@ MODULE dataDefinedScattering
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = (crossSec%cdf(i)%values - crossSec%cdf(i)%values(1)) / (crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)) 
         END DO
-        
-        !DO i = 1, ct
-        !    print*, minVAL(crossSec%cdf(i)%angles), maxval(crossSec%cdf(i)%angles)
-        !end do
 
         crossSec%ready = .TRUE.
         crossSec1D%ready = .TRUE.
@@ -350,7 +337,7 @@ MODULE dataDefinedScattering
     END SUBROUTINE
 
 
-  FUNCTION lineToArray(line) RESULT(row)
+  PURE FUNCTION lineToArray(line) RESULT(row)
     CHARACTER(LEN=*), INTENT(IN) :: line
     REAL(KIND=REAL64), ALLOCATABLE, DIMENSION(:) :: row
     INTEGER :: err, j, st, st_old, ind
