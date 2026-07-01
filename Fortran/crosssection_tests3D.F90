@@ -5,37 +5,40 @@ PROGRAM crossSectionTests
 
 
     CHARACTER(LEN=30) :: name = "carbon"
-    REAL(KIND=REAL64) :: val
     TYPE(crossSection3D) :: xsec
-    TYPE(xsecSample) :: res
+    TYPE(xsecSample) :: val
 
     CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64)
     xsec = get3DCrossSection(name)
     PRINT*, xsec%used, xsec%ready
 
     !val = sampleAngleFromSection(xsec, 100.0_REAL64, randomVal(0.1_REAL64))
-    res = sampleAtEnergy(xsec%cdf(10), xsec%exit_energy(10), xsec%rvalue(10), 0.1_REAL64)
-    PRINT*, res%e, res%r
-    !val = sampleAngleFromSection(xsec, 73.0_REAL64, randomVal(0.1_REAL64))
-    !PRINT*, val
-    !val = sampleAngleFromSection(xsec, 5.3_REAL64, randomVal(0.5_REAL64))
-    !PRINT*, val
+    val = sampleAtEnergy(xsec%cdf(10), xsec%exit_energy(10), xsec%rvalue(10), 0.1_REAL64)
+    PRINT*, val%e, val%r
 
-    !val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(0.0_REAL64))
-    !PRINT*, val
-    !val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(1.0_REAL64))
-    !PRINT*, val
+    val = sampleAngleFromSection(xsec, 73.0_REAL64, randomVal(0.1_REAL64))
+     PRINT*, val%e, val%r
 
+    val = sampleAngleFromSection(xsec, 5.3_REAL64, randomVal(0.5_REAL64))
+    PRINT*, val%e, val%r
 
-    !val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(0.0_REAL64))
-    !PRINT*, val
-    !val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(1.0_REAL64))
-    !PRINT*, val
+    val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(0.0_REAL64))
+    PRINT*, val%e, val%r
 
-    !val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.1_REAL64))
-    !PRINT*, val
-    !val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.67_REAL64))
-    !PRINT*, val
+    val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(1.0_REAL64))
+    PRINT*, val%e, val%r
+
+    val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(0.0_REAL64))
+    PRINT*, val%e, val%r
+
+    val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(1.0_REAL64))
+    PRINT*, val%e, val%r
+
+    val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.1_REAL64))
+    PRINT*, val%e, val%r
+
+    val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.67_REAL64))
+    PRINT*, val%e, val%r
 
 #ifdef undef
 

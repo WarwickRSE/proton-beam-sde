@@ -58,6 +58,7 @@ MODULE dataDefinedScattering
     END INTERFACE
     INTERFACE sampleAngleFromSection
       MODULE PROCEDURE sampleAngleFromSection2D
+      MODULE PROCEDURE sampleAngleFromSection3D
     END INTERFACE
     INTERFACE sampleAtEnergy
       MODULE PROCEDURE sampleAtEnergy2D
@@ -522,7 +523,7 @@ MODULE dataDefinedScattering
     END FUNCTION
 
 
-    FUNCTION sampleAtEnergy3D(cdf, en, r, u) RESULT(val)
+    PURE FUNCTION sampleAtEnergy3D(cdf, en, r, u) RESULT(val)
         TYPE(crossSectionRow), INTENT(IN) :: cdf, en, r
         REAL(KIND=REAL64), INTENT(IN) :: u
         TYPE(xsecSample) :: val
@@ -531,7 +532,6 @@ MODULE dataDefinedScattering
         INTEGER :: ct, ind
 
         ct = SIZE(cdf%values)
-        PRINT*, ct, u
         IF(u <= cdf%values(1)) THEN
             val%e = en%values(1)
             val%r = r%values(1)
@@ -557,5 +557,40 @@ MODULE dataDefinedScattering
         END IF
  
     END FUNCTION
+    
+    PURE FUNCTION sampleAngleFromSection3D(crossSection, energy, val) RESULT(sample)
+        TYPE(crossSection3D), INTENT(IN) :: crossSection
+        REAL(KIND=REAL64), INTENT(IN) :: energy
+        TYPE(randomVal), VALUE :: val
+        REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
+        REAL(KIND=REAL64) :: diff
+        TYPE(xsecSample) :: sample, tmp_sample
+        INTEGER :: sz, ind
+
+        sz = SIZE(crossSection%energies)
+        IF(energy <= crossSection%energies(1)) THEN
+            ! Use lowest energy strand
+            sample = sampleAtEnergy(crossSection%cdf(1), crossSection%exit_energy(1), crossSection%rvalue(1), val%v)
+        ELSE IF(energy > crossSection%energies(sz)) THEN
+            ! Highest energy strand
+             sample = sampleAtEnergy(crossSection%cdf(sz), crossSection%exit_energy(sz), crossSection%rvalue(sz), val%v)
+        ELSE
+            ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies >= energy))
+            ! Do angle at ind
+            sample = sampleAtEnergy(crossSection%cdf(ind), crossSection%exit_energy(ind), crossSection%rvalue(ind), val%v)
+ 
+            IF((crossSection%energies(ind) - crossSection%energies(ind-1)) > tol) THEN
+                ! If needed do one bin lower and interpolate
+                tmp_sample = sampleAtEnergy(crossSection%cdf(ind-1), crossSection%exit_energy(ind-1), crossSection%rvalue(ind-1), val%v)
+                diff = (energy - crossSection%energies(ind-1)) / &
+                  (crossSection%energies(ind) - crossSection%energies(ind-1))
+                sample%e = sample%e * diff + tmp_sample%e * (1.0_REAL64 - diff)
+                sample%r = sample%r * diff + tmp_sample%r * (1.0_REAL64 - diff)
+            END IF
+        END IF
+
+    END FUNCTION
+
+
 
 END MODULE
