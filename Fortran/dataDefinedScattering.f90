@@ -32,24 +32,36 @@ MODULE dataDefinedScattering
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: values
     END TYPE
     TYPE crossSection3D
-        LOGICAL :: ready = .FALSE. ! Debug/development 
+        LOGICAL :: ready = .FALSE., used = .TRUE. ! Debug/development 
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies
         TYPE(crossSectionRow), DIMENSION(:), ALLOCATABLE :: exit_energy, cdf, rvalue
+    END TYPE
+    TYPE xsecSample
+        REAL(KIND=REAL64) :: e, r
     END TYPE
 
     ! Associative arrays, index will be ATOMIC number
     CHARACTER(LEN=30), DIMENSION(:), ALLOCATABLE :: atom_names
     TYPE(crossSection1D), DIMENSION(:), ALLOCATABLE :: NE_crossSections, RU_crossSections
     TYPE(crossSection2D), DIMENSION(:), ALLOCATABLE :: RU_angle_cdf
+    TYPE(crossSection3D), DIMENSION(:), ALLOCATABLE :: NE_angle_cdf
 
     INTERFACE fillCrossSections
       MODULE PROCEDURE fillCrossSections1D
       MODULE PROCEDURE fillCrossSectionsRuth
       MODULE PROCEDURE fillCrossSectionsHydrogen
+      MODULE PROCEDURE fillCrossSections3D
     END INTERFACE
 
     INTERFACE evaluate
       MODULE PROCEDURE evaluate1DCrossSection
+    END INTERFACE
+    INTERFACE sampleAngleFromSection
+      MODULE PROCEDURE sampleAngleFromSection2D
+    END INTERFACE
+    INTERFACE sampleAtEnergy
+      MODULE PROCEDURE sampleAtEnergy2D
+      MODULE PROCEDURE sampleAtEnergy3D
     END INTERFACE
 
     CONTAINS
@@ -84,7 +96,17 @@ MODULE dataDefinedScattering
               CALL fillCrossSections(file, RU_angle_cdf(i), RU_crossSections(i), ru_cutoff, bs_cutoff)
             END IF
         END DO
-
+        ALLOCATE(NE_angle_cdf(SIZE(names)))
+        DO i = 1, SIZE(names)
+            file = TRIM(datadir)//ADJUSTL(TRIM(names(i)))//"_ne_energyangle_cdf.txt"
+            IF(TRIM(names(i)) /= 'hydrogen' ) THEN
+              CALL fillCrossSections(file, NE_angle_cdf(i))
+            ELSE
+              NE_angle_cdf(i)%used = .FALSE.
+              NE_angle_cdf(i)%ready = .TRUE.
+            END IF
+        END DO
+ 
     END SUBROUTINE
 
     FUNCTION getCrossSectionIndex(name) RESULT(ind)
@@ -121,6 +143,15 @@ MODULE dataDefinedScattering
 
         X = RU_angle_cdf(ind)
     END FUNCTION
+    FUNCTION get3DCrossSection(name) RESULT(X)
+        CHARACTER(LEN=30) :: name
+        TYPE(crossSection3D) :: X
+        INTEGER :: ind
+
+        ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
+        X = NE_angle_cdf(ind)
+    END FUNCTION
+
 
     !> \brief Helper - read a 1-D section
     SUBROUTINE fillCrossSections1D(file, crossSec)
@@ -338,11 +369,9 @@ MODULE dataDefinedScattering
     st_old = 1
     ind = 1
     READ(line, *, IOSTAT=err) row
-    !PRINT*, "Error ", err, SIZE(row)
     IF(err /= 0) ERROR STOP "Failed to read values"
 
   END FUNCTION
-
 
     !The data in the file is expected in the following format:
    !  - First line contains the energy values.
@@ -373,7 +402,6 @@ MODULE dataDefinedScattering
         IF(err == -1) ERROR STOP "Data file "//TRIM(file)//" too short, only found one line"
         IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
         row = lineToArray(buffer)
-        PRINT*, row
         ! Store first row into 'energies'
         crossSec%energies = row
         row_ct = SIZE(crossSec%energies)
@@ -386,9 +414,7 @@ MODULE dataDefinedScattering
                 READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
                 IF(err == -1) EXIT lines ! END OF FILE, break outer loop
                 IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
-                !PRINT*, i, err
                 row = lineToArray(buffer)
-                PRINT*, SIZE(row)
                 IF(j == 1) THEN
                     crossSec%exit_energy(i)%values = row
                 ELSE IF(j == 2) THEN
@@ -436,7 +462,7 @@ MODULE dataDefinedScattering
     
     END FUNCTION
 
-    PURE FUNCTION sampleAtEnergy(cdf, u) RESULT(val)
+    PURE FUNCTION sampleAtEnergy2D(cdf, u) RESULT(val)
         TYPE(cdfRow), INTENT(IN) :: cdf
         REAL(KIND=REAL64), INTENT(IN) :: u
         REAL(KIND=REAL64) :: val, diff
@@ -465,7 +491,7 @@ MODULE dataDefinedScattering
         END IF
     END FUNCTION
 
-    PURE FUNCTION sampleAngleFromSection(crossSection, energy, val) RESULT(angle)
+    PURE FUNCTION sampleAngleFromSection2D(crossSection, energy, val) RESULT(angle)
         TYPE(crossSection2D), INTENT(IN) :: crossSection
         REAL(KIND=REAL64), INTENT(IN) :: energy
         TYPE(randomVal), VALUE :: val
@@ -493,6 +519,43 @@ MODULE dataDefinedScattering
             END IF
         END IF
 
+    END FUNCTION
+
+
+    FUNCTION sampleAtEnergy3D(cdf, en, r, u) RESULT(val)
+        TYPE(crossSectionRow), INTENT(IN) :: cdf, en, r
+        REAL(KIND=REAL64), INTENT(IN) :: u
+        TYPE(xsecSample) :: val
+        REAL(KIND=REAL64) :: diff
+        REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
+        INTEGER :: ct, ind
+
+        ct = SIZE(cdf%values)
+        PRINT*, ct, u
+        IF(u <= cdf%values(1)) THEN
+            val%e = en%values(1)
+            val%r = r%values(1)
+        ELSE IF(u >= cdf%values(ct)) THEN
+            val%e = en%values(ct)
+            val%r = r%values(ct)
+        ELSE
+            ! Location of first value which exceeds target
+            ind = MINLOC(cdf%values, DIM=1, MASK=(cdf%values >= u))
+            ! Interpolate if values are not too close together
+            ! NOTE: interpolate the angle based on the cdf spacing
+            IF(cdf%values(ind) - cdf%values(ind-1) > tol) THEN
+              diff = (u - cdf%values(ind-1)) / &
+                (cdf%values(ind) - cdf%values(ind-1))
+              val%e = en%values(ind) * diff + &
+                en%values(ind-1) * (1.0_REAL64 - diff)
+              val%r = r%values(ind) * diff + &
+                r%values(ind-1) * (1.0_REAL64 - diff)
+            ELSE
+              val%e = en%values(ind)
+              val%r = r%values(ind)
+            END IF
+        END IF
+ 
     END FUNCTION
 
 END MODULE
