@@ -158,8 +158,7 @@ MODULE dataDefinedScattering
     SUBROUTINE fillCrossSections1D(file, crossSec)
         CHARACTER(LEN=132), INTENT(IN) :: file
         TYPE(crossSection1D), INTENT(INOUT) :: crossSec
-        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
-        INTEGER :: unit, err, ct
+        INTEGER :: unit, err
 
         OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
 
@@ -167,16 +166,10 @@ MODULE dataDefinedScattering
             PRINT*, "Error opening File "//TRIM(file)
             ERROR STOP
         END IF
-        !Suggest starting each file with the count - its a lot easier
-        READ(unit, *) ct
-        ! Read the pre-prepared data files by material name/number ?
-        ALLOCATE(energies(ct), values(ct))
         ! Header row
-        READ(unit, *) energies
-        READ(unit, *) values
+        CALL readLineOfReals(unit, crossSec%energies, err)
+        CALL readLineOfReals(unit, crossSec%values, err)
 
-        CALL MOVE_ALLOC(energies, crossSec%energies)
-        CALL MOVE_ALLOC(values, crossSec%values)
         crossSec%ready = .TRUE.
         
         CLOSE(unit)
