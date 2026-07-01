@@ -1,5 +1,6 @@
 MODULE dataDefinedScattering
     USE iso_fortran_env, only: real64 ! REPLACE WITH kinds!
+    USE SDEFileUtilities
     IMPLICIT NONE
 
     REAL(KIND=REAL64), PARAMETER :: pi = 3.14159265_REAL64
@@ -152,7 +153,6 @@ MODULE dataDefinedScattering
         ind = MINLOC(atom_names, DIM=1, MASK=(atom_names == name))
         X = NE_angle_cdf(ind)
     END FUNCTION
-
 
     !> \brief Helper - read a 1-D section
     SUBROUTINE fillCrossSections1D(file, crossSec)
@@ -337,30 +337,6 @@ MODULE dataDefinedScattering
     END SUBROUTINE
 
 
-  PURE FUNCTION lineToArray(line) RESULT(row)
-    CHARACTER(LEN=*), INTENT(IN) :: line
-    REAL(KIND=REAL64), ALLOCATABLE, DIMENSION(:) :: row
-    INTEGER :: err, j, st, st_old, ind
-    INTEGER, PARAMETER :: maxbins=1000
- 
-    st = 1
-    st_old = 1
-    ind = 1
-    ! Find out how many substrings there are
-    DO j = 1, maxbins
-      IF(st >= LEN(TRIM(line))) EXIT
-      ind = SCAN(line(st:), " ")
-      st = st + ind
-    END DO
-    ALLOCATE(row(j-1))
-    st = 1
-    st_old = 1
-    ind = 1
-    READ(line, *, IOSTAT=err) row
-    IF(err /= 0) ERROR STOP "Failed to read values"
-
-  END FUNCTION
-
     !The data in the file is expected in the following format:
    !  - First line contains the energy values.
    !  - For each energy value, there are three more lines in the file, 
@@ -369,9 +345,7 @@ MODULE dataDefinedScattering
     SUBROUTINE fillCrossSections3D(file, crossSec)
         CHARACTER(LEN=*), INTENT(IN) :: file
         TYPE(crossSection3D), INTENT(INOUT) :: crossSec
-        CHARACTER(LEN = :), ALLOCATABLE :: buffer
-        CHARACTER(LEN=32) :: fmt
-        INTEGER :: i,j, unit, err, sz, row_ct
+        INTEGER :: i,j, unit, err, row_ct
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: row
 
         OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
@@ -381,17 +355,13 @@ MODULE dataDefinedScattering
             ERROR STOP
         END IF
         !Preparing to read a line of unknown count
-        WRITE(fmt, *) max_buf
-        fmt = TRIM("(A"//ADJUSTL(fmt))//")"
-        ALLOCATE(CHARACTER(LEN=max_buf)::buffer)
 
         ! Read the header row of the energies
-        READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
-        IF(err == -1) ERROR STOP "Data file "//TRIM(file)//" too short, only found one line"
-        IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
-        row = lineToArray(buffer)
         ! Store first row into 'energies'
+        CALL readLineOfReals(unit, row, err)
+        IF(err == -1) ERROR STOP "Data file "//TRIM(file)//" too short, only found one line"
         crossSec%energies = row
+
         row_ct = SIZE(crossSec%energies)
         ALLOCATE(crossSec%exit_energy(row_ct), crossSec%cdf(row_ct), crossSec%rvalue(row_ct))
 
@@ -399,10 +369,8 @@ MODULE dataDefinedScattering
             ! Read lines in blocks of 3
             DO j = 1, 3
                 ! Read a whole line
-                READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
+                CALL readLineOfReals(unit, row, err)
                 IF(err == -1) EXIT lines ! END OF FILE, break outer loop
-                IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
-                row = lineToArray(buffer)
                 IF(j == 1) THEN
                     crossSec%exit_energy(i)%values = row
                 ELSE IF(j == 2) THEN
@@ -577,7 +545,5 @@ MODULE dataDefinedScattering
         END IF
 
     END FUNCTION
-
-
 
 END MODULE
