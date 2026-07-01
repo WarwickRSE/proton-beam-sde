@@ -4,6 +4,7 @@ MODULE dataDefinedScattering
 
     CHARACTER(LEN=50), PARAMETER :: datadir = "../Splines/" ! Temporary
     REAL(KIND=REAL64), PARAMETER :: pi = 3.14159265_REAL64
+    INTEGER, PARAMETER :: max_buf = 2**16, max_lines = 2**8
 
     TYPE randomGen
     ! This exists just to flag where random numbers are needed here
@@ -27,9 +28,13 @@ MODULE dataDefinedScattering
         TYPE(cdfRow), DIMENSION(:), ALLOCATABLE :: cdf
     END TYPE
 
+    TYPE crossSectionRow
+        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: values
+    END TYPE
     TYPE crossSection3D
         LOGICAL :: ready = .FALSE. ! Debug/development 
-        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, values
+        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies
+        TYPE(crossSectionRow), DIMENSION(:), ALLOCATABLE :: exit_energy, cdf, rvalue
     END TYPE
 
     ! Associative arrays, index will be ATOMIC number
@@ -283,7 +288,6 @@ MODULE dataDefinedScattering
             IF(b_ct > f_ct) ERROR STOP "I don't think the cutoffs can be this way round"
             ! Move the angles array
             crossSec%cdf(i)%angles = tmp(b_ct:f_ct)
-   !         PRINT*, b_ct, f_ct, f_ct-b_ct, SIZE(tmp(b_ct:f_ct))
             crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
             ! Allocate and read the cdf row including one value past the cutoff
             !ALLOCATE(crossSec%cdf(i)%values(f_ct-b_ct))
@@ -314,6 +318,87 @@ MODULE dataDefinedScattering
     END SUBROUTINE
 
 
+  FUNCTION lineToArray(line) RESULT(row)
+    CHARACTER(LEN=*), INTENT(IN) :: line
+    REAL(KIND=REAL64), ALLOCATABLE, DIMENSION(:) :: row
+    INTEGER :: err, j, st, st_old, ind
+    INTEGER, PARAMETER :: maxbins=1000
+ 
+    st = 1
+    st_old = 1
+    ind = 1
+    ! Find out how many substrings there are
+    DO j = 1, maxbins
+      IF(st >= LEN(TRIM(line))) EXIT
+      ind = SCAN(line(st:), " ")
+      st = st + ind
+    END DO
+    ALLOCATE(row(j-1))
+    st = 1
+    st_old = 1
+    ind = 1
+    READ(line, *, IOSTAT=err) row
+    !PRINT*, "Error ", err, SIZE(row)
+    IF(err /= 0) ERROR STOP "Failed to read values"
+
+  END FUNCTION
+
+
+    !The data in the file is expected in the following format:
+   !  - First line contains the energy values.
+   !  - For each energy value, there are three more lines in the file, 
+   !    the first of which contains the exit energies, the second contains the corresponding CDF, and the 
+   !    third contains the rvalues (pre-compound fraction see p. 136 in [4]) corresponding to each exit energy  
+    SUBROUTINE fillCrossSections3D(file, crossSec)
+        CHARACTER(LEN=*), INTENT(IN) :: file
+        TYPE(crossSection3D), INTENT(INOUT) :: crossSec
+        CHARACTER(LEN = :), ALLOCATABLE :: buffer
+        CHARACTER(LEN=32) :: fmt
+        INTEGER :: i,j, unit, err, sz, row_ct
+        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: row
+
+        OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
+
+        IF(err /= 0) THEN
+            PRINT*, "Error opening File "//TRIM(file)
+            ERROR STOP
+        END IF
+        !Preparing to read a line of unknown count
+        WRITE(fmt, *) max_buf
+        fmt = TRIM("(A"//ADJUSTL(fmt))//")"
+        ALLOCATE(CHARACTER(LEN=max_buf)::buffer)
+
+        ! Read the header row of the energies
+        READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
+        IF(err == -1) ERROR STOP "Data file "//TRIM(file)//" too short, only found one line"
+        IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
+        row = lineToArray(buffer)
+        PRINT*, row
+        ! Store first row into 'energies'
+        crossSec%energies = row
+        row_ct = SIZE(crossSec%energies)
+        ALLOCATE(crossSec%exit_energy(row_ct), crossSec%cdf(row_ct), crossSec%rvalue(row_ct))
+
+        lines : DO i = 1, FLOOR(max_lines/3.0) ! Sanity check: avoid reading unexpectdly large data set
+            ! Read lines in blocks of 3
+            DO j = 1, 3
+                ! Read a whole line
+                READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
+                IF(err == -1) EXIT lines ! END OF FILE, break outer loop
+                IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
+                !PRINT*, i, err
+                row = lineToArray(buffer)
+                PRINT*, SIZE(row)
+                IF(j == 1) THEN
+                    crossSec%exit_energy(i)%values = row
+                ELSE IF(j == 2) THEN
+                    crossSec%cdf(i)%values = row
+                ELSE IF(j == 3) THEN
+                    crossSec%rvalue(i)%values = row
+                END IF
+            END DO
+        END DO lines
+    END SUBROUTINE
 
     PURE FUNCTION evaluate1DCrossSection(crossSection, energy) RESULT(val)
         TYPE(crossSection1D), INTENT(IN) :: crossSection
