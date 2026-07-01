@@ -34,7 +34,7 @@ MODULE SDEFileUtilities
     READ(unit, fmt, SIZE=sz, IOSTAT=err, ADVANCE='NO') buffer
     IF(err == -1) RETURN ! END OF FILE, return to caller!
     IF(err == -2 .AND. sz >= LEN(buffer)) ERROR STOP "Line buffer size "//fmt//"too small for file. Increase max_buf and try again"
-    row = lineToArray(buffer)
+    row = lineToArray(buffer, delim)
 
  END SUBROUTINE
 
