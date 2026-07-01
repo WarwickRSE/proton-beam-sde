@@ -184,7 +184,7 @@ MODULE dataDefinedScattering
         REAL(KIND=REAL64), INTENT(IN) :: cutoff
         REAL(KIND=REAL64) :: interp
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: energies, tmp
-        INTEGER :: i, unit, err, ct, a_ct, f_ct
+        INTEGER :: i, unit, err, f_ct, e_ct, a_ct
 
         OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
 
@@ -192,28 +192,30 @@ MODULE dataDefinedScattering
             PRINT*, "Error opening File "//TRIM(file)
             ERROR STOP
         END IF
-        !Suggest starting each file with the (line length) count - its a lot easier
-        READ(unit, *) ct, a_ct
         ! Read the pre-prepared data files by material name/number ?
-        ALLOCATE(energies(ct), crossSec%cdf(ct), tmp(a_ct))
 
         ! Header row
-        READ(unit, *) energies
+        CALL readLineOfReals(unit, energies, err)
 
         ! Allocation
         crossSec1D%energies = energies
-        ALLOCATE(crossSec1D%values(SIZE(energies)))
-        CALL MOVE_ALLOC(energies, crossSec%energies)
+        e_ct = SIZE(energies)
+        ALLOCATE(crossSec%cdf(e_ct))
+        ALLOCATE(crossSec1D%values(e_ct))
 
-        DO i = 1, ct
+        CALL MOVE_ALLOC(energies, crossSec%energies)
+        DO i = 1, e_ct
             ! For each row:
             ! Read the angles
-            READ(unit, *, IOSTAT=err) tmp
-            IF(err /= 0) ERROR STOP "Missing Energy Value in File "//TRIM(file)
+            CALL readLineOfReals(unit, tmp, err)
             ! Find cutoff index
             ! TODO - check for off-by-one
+            a_ct = SIZE(tmp)
             f_ct = MINLOC(tmp, DIM=1, MASK=(tmp >= cutoff)) + 1
             ! Move the angles array
+            ! IF cutoff not found, then use the last value
+            ! TODO - handle this case better
+            if(f_ct > a_ct) f_ct = a_ct
             crossSec%cdf(i)%angles = tmp(1:f_ct)
             crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
             ! Allocate and read the cdf row including one value past the cutoff
