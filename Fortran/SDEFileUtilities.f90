@@ -3,7 +3,7 @@ MODULE SDEFileUtilities
   USE iso_fortran_env, ONLY : REAL64
   IMPLICIT NONE
 
-  INTEGER, PARAMETER, PRIVATE :: maxbins=1000
+  INTEGER, PARAMETER, PRIVATE :: maxbins = 10000 ! Prevent infinite loop if delim not found
   INTEGER, PARAMETER, PRIVATE :: max_buf = 2**16
 
  CONTAINS
@@ -60,6 +60,7 @@ MODULE SDEFileUtilities
       ind = SCAN(line(st:), delim)
       st = st + ind
     END DO
+    IF(j >= maxbins) ERROR STOP "More values in this line than we can handle"
     ALLOCATE(row(j-1))
     st = 1
     st_old = 1
