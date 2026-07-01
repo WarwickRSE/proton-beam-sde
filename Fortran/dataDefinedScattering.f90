@@ -344,7 +344,7 @@ MODULE dataDefinedScattering
     SUBROUTINE fillCrossSections3D(file, crossSec)
         CHARACTER(LEN=*), INTENT(IN) :: file
         TYPE(crossSection3D), INTENT(INOUT) :: crossSec
-        INTEGER :: i,j, unit, err, row_ct
+        INTEGER :: i,j, unit, err, row_ct, e_ct, c_ct
         REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: row
 
         OPEN(newunit=unit, FILE=file, ACTION="READ", IOSTAT=err)
@@ -371,11 +371,18 @@ MODULE dataDefinedScattering
                 CALL readLineOfReals(unit, row, err)
                 IF(err == -1) EXIT lines ! END OF FILE, break outer loop
                 IF(j == 1) THEN
+                    e_ct = SIZE(row)
                     crossSec%exit_energy(i)%values = row
                 ELSE IF(j == 2) THEN
+                    c_ct = SIZE(row)
                     crossSec%cdf(i)%values = row
                 ELSE IF(j == 3) THEN
                     crossSec%rvalue(i)%values = row
+                    IF(e_ct /= SIZE(row) .OR. e_ct /= c_ct) THEN
+                        PRINT*, "Inconsistent counts in data file"//file
+                        PRINT*, e_ct, c_ct, SIZE(row)
+                        ERROR STOP
+                    END IF
                 END IF
             END DO
         END DO lines
