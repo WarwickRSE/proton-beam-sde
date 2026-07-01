@@ -8,9 +8,8 @@ PROGRAM crossSectionTests
     TYPE(crossSection3D) :: xsec
     TYPE(xsecSample) :: val
 
-    CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64)
+    CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64, "../Splines")
     xsec = get3DCrossSection(name)
-    PRINT*, xsec%used, xsec%ready
 
     !val = sampleAngleFromSection(xsec, 100.0_REAL64, randomVal(0.1_REAL64))
     val = sampleAtEnergy(xsec%cdf(10), xsec%exit_energy(10), xsec%rvalue(10), 0.1_REAL64)
