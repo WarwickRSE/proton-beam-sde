@@ -73,8 +73,9 @@ MODULE dataDefinedScattering
         CHARACTER(LEN=30), DIMENSION(:), INTENT(IN) :: names
         CHARACTER(LEN=*), INTENT(IN) :: data_path
         REAL(KIND=REAL64), INTENT(IN) :: ru_cutoff, bs_cutoff
+        REAL(KIND=REAL64), DIMENSION(:), ALLOCATABLE :: dummy
         CHARACTER(LEN=132) :: file
-        INTEGER :: i
+        INTEGER :: i, err
 
         atom_names = names
 
@@ -108,6 +109,9 @@ MODULE dataDefinedScattering
               CALL fillCrossSections(file, NE_angle_cdf(i))
             END IF
         END DO
+
+        ! Deallocating read buffer
+        CALL readLineOfReals(-1, dummy, err, dealloc=.TRUE.)
  
     END SUBROUTINE
 
