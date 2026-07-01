@@ -4,6 +4,7 @@ MODULE randomMod
 
     USE iso_fortran_env
 
+    IMPLICIT NONE
     TYPE KissRNGState
       INTEGER :: x = 123456789, y = 362436069, z = 521288629, w = 916191069
     END TYPE
@@ -56,8 +57,8 @@ MODULE randomMod
     b3 = 5
     state%y  = IEOR(a3, ISHFT(a3, b3))
 
-    z = 18000 * IAND(state%z, 65535) + ISHFT(state%z, - 16)
-    w = 30903 * IAND(state%w, 65535) + ISHFT(state%w, - 16)
+    state%z = 18000 * IAND(state%z, 65535) + ISHFT(state%z, - 16)
+    state%w = 30903 * IAND(state%w, 65535) + ISHFT(state%w, - 16)
 
     kiss = state%x + state%y + ISHFT(state%z, 16) + state%w
 
@@ -196,7 +197,7 @@ MODULE randomMod
   FUNCTION random_beta(state, beta) RESULT(ran)
     TYPE(KissRNGState), INTENT(INOUT) :: state
     REAL(KIND=REAL64) :: ran
-    INTEGER :: beta
+    INTEGER, INTENT(IN) :: beta
 
     !ran = rejection_sample_beta(state, beta_pdf, beta)
     ran = beta_fn(1+beta, 1) * (1.0 + beta) * random(state)
