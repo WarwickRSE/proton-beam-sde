@@ -3,8 +3,8 @@ MODULE SDEFileUtilities
   USE iso_fortran_env, ONLY : REAL64
   IMPLICIT NONE
 
-  INTEGER, PARAMETER, PRIVATE :: maxbins = 10000 ! Prevent infinite loop if delim not found
-  INTEGER, PARAMETER, PRIVATE :: max_buf = 2**16
+  INTEGER, PARAMETER, PRIVATE :: maxbins = 11000 ! Prevent infinite loop if delim not found
+  INTEGER, PARAMETER, PRIVATE :: max_buf = 2**20 ! Needed to read the entire cross section
 
  CONTAINS
 
