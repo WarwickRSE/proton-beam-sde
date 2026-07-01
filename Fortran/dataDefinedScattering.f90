@@ -489,7 +489,7 @@ MODULE dataDefinedScattering
         IF(u <= cdf%values(1)) THEN
             val%e = en%values(1)
             val%r = r%values(1)
-        ELSE IF(u >= cdf%values(ct)) THEN
+        ELSE IF(u > cdf%values(ct)) THEN
             val%e = en%values(ct)
             val%r = r%values(ct)
         ELSE
