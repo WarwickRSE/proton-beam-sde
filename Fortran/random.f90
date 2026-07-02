@@ -182,7 +182,12 @@ MODULE randomMod
   PURE FUNCTION beta_fn(a, b)
     INTEGER, INTENT(IN) :: a, b
     REAL(KIND=REAL64) :: beta_fn
-    beta_fn = gamma(REAL(a)) * gamma(REAL(b)) / gamma(REAL(a) + REAL(b))
+    beta_fn = gamma(REAL(a, KIND=REAL64)) * gamma(REAL(b, KIND=REAL64)) / gamma(REAL(a, KIND=REAL64) + REAL(b, KIND=REAL64))
+  END FUNCTION
+  PURE FUNCTION log_beta_fn(a, b)
+    INTEGER, INTENT(IN) :: a, b
+    REAL(KIND=REAL64) :: log_beta_fn
+    log_beta_fn = log_gamma(REAL(a, KIND=REAL64)) + log_gamma(REAL(b, KIND=REAL64)) - log_gamma(REAL(a + b, KIND=REAL64))
   END FUNCTION
   
   FUNCTION beta_pdf(x, beta)
@@ -193,15 +198,15 @@ MODULE randomMod
     beta_pdf = gamma(1.0 + beta) / gamma(REAL(beta)) * (1.0 - x)**(beta - 1) / REAL(beta)
   END FUNCTION
 
-  FUNCTION random_beta(state, beta) RESULT(ran)
-    TYPE(KissRNGState), INTENT(INOUT) :: state
+  FUNCTION random_beta(beta) RESULT(ran)
     REAL(KIND=REAL64) :: ran
     INTEGER :: beta
 
     !ran = rejection_sample_beta(state, beta_pdf, beta)
-    ran = beta_fn(1+beta, 1) * (1.0 + beta) * random(state)
-    ran = ran**(1.0/(1.0 + beta))
-    ran = 1.0_REAL64 - ran
+    ! Calculate log beta
+    ran = log_beta_fn(1+beta, 1) + log((1.0 + beta) * random(1))
+    ran = ran*(1.0/(1.0 + beta))
+    ran = 1.0_REAL64 - exp(ran)
   END FUNCTION
 
 END MODULE
