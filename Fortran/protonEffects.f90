@@ -15,6 +15,9 @@ MODULE protonEffects
     
     CONTAINS
 
+    !> \brief Computes the inelastic energy loss per unit track length
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION bethe_bloch_loss(material, energy) RESULT(loss)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
@@ -33,6 +36,9 @@ MODULE protonEffects
       END DO
     END FUNCTION
 
+    !> \brief Computes the rate of large angle scattering per unit track
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION nonelastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
@@ -48,6 +54,9 @@ MODULE protonEffects
       rate = rate * EXP(LOG(material%density) + log_avogadro + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
 
+    !> \brief Compute the rate for rutherford and elastic scatter
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION rutherford_and_elastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
