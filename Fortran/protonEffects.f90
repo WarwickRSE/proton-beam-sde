@@ -12,6 +12,10 @@ MODULE protonEffects
     REAL(KIND=REAL64), PARAMETER :: mecsq = 0.511_REAL64, mpcsq = 938.346_REAL64
     REAL(KIND=REAL64), PARAMETER :: log_avogadro = LOG(6.0) + 23.0 * LOG(10.0), log_barns_to_cmsq = -24.0 * LOG(10.0)
     REAL(KIND=REAL64), PARAMETER :: alpha = 1.0_REAL64 / 137.0_REAL64
+
+    TYPE nonElasticUpdate
+      REAL(KIND=REAL64) :: energy, cos_angle
+    END TYPE
     
     CONTAINS
 
@@ -366,4 +370,205 @@ MODULE protonEffects
 
       energy_out = MAX(energy_out, 0.0_REAL64)
     END FUNCTION
+
+    !> \brief Computes the direction of transport after a scattering event
+    !> \param direction_in The initial direction of transport in spherical coordinates
+    !> \param scatter_angles The scattering angles in spherical coordinates
+    !> \return The new direction of transport in spherical coordinates
+    PURE FUNCTION update_direction(direction_in, scatter_angles) RESULT(direction_out)
+      REAL(KIND=REAL64), DIMENSION(2), INTENT(IN) :: direction_in, scatter_angles
+      REAL(KIND=REAL64), DIMENSION(2) :: direction_out
+      REAL(KIND=REAL64), DIMENSION(3) :: direction
+      REAL(KIND=REAL64) :: magnitude
+
+      ! Compute new direction in Cartesian coordinates
+      ! direction = cos(alpha)e_r + sin(alpha)(sin(beta) e_theta + cos(beta) e_phi)
+      ! Where:
+      ! theta=ang[0], phi=ang[1]
+      ! e_r = (sin(theta)cos(phi), sin(theta)sin(phi), cos(theta))
+      ! e_theta = (cos(theta)cos(phi),cos(theta)sin(phi), -sin(theta))
+      ! e_phi = (-sin(phi), cos(phi), 0)  
+      direction(1) = sin(direction_in(1)) * cos(direction_in(2)) * cos(scatter_angles(1)) + &
+                     (cos(direction_in(1)) * cos(direction_in(2)) * sin(scatter_angles(2)) - & 
+                     sin(direction_in(2)) * cos(scatter_angles(2))) * sin(scatter_angles(1))
+      direction(2) = sin(direction_in(1)) * sin(direction_in(2)) * cos(scatter_angles(1)) + &
+                     (cos(direction_in(1)) * sin(direction_in(2)) * sin(scatter_angles(2)) + & 
+                     cos(direction_in(2)) * cos(scatter_angles(2))) * sin(scatter_angles(1))
+      direction(3) = cos(direction_in(1)) * cos(scatter_angles(1)) - &
+                      sin(direction_in(1)) * sin(scatter_angles(1)) * sin(scatter_angles(2))
+
+      ! Normalise the direction vector
+      magnitude = SQRT(SUM(direction**2))
+      direction = direction / magnitude
+
+      ! Convert back to spherical coordinates
+      direction_out(1) = ACOS(direction(3))
+      direction_out(2) = ATAN2(direction(2), direction(1))
+    END FUNCTION
+
+    !> \brief Compute separation energy for incident particles
+    !> S_A as in Section 6.2.3.2 on p. 137 in [4]
+    !> References:
+    !>  [4] https://doi.org/10.2172/1425114
+    !> \param nuc The nuclide for which to compute the separation energy
+    !> \return The separation energy in MeV
+    PURE FUNCTION separation_energy(nuc) RESULT(sep_energy)
+      TYPE(cp_nuclide), INTENT(IN) :: nuc
+      REAL(KIND=REAL64) :: sep_energy
+      REAL(KIND=REAL64) :: a_a, a_c, n_a, n_c, z_a, z_c
+    
+      a_a = nuc%A ! mass number of target nuclei
+      a_c = nuc%A + 1 ! mass number of compound nuclei
+      n_a = nuc%A - nuc%Z ! neutron number of target nuclei
+      n_c = nuc%A - nuc%Z ! neutron number of compound nuclei
+      z_a = nuc%Z ! proton number of target nuclei
+      z_c = nuc%Z + 1 ! proton number of compound nuclei
+
+      sep_energy =  15.68_REAL64 * (a_c - a_a) - &
+                    28.07_REAL64 * ((n_c - z_c)**2 / a_c - (n_a - z_a)**2 / a_a) - &
+                    18.56_REAL64 * (a_c**(2.0/3.0) - a_a**(2.0/3.0)) + &
+                    33.22_REAL64 * ((n_c - z_c)**2/(a_c**(4.0/3.0)) - (n_a - z_a)**2/(a_a**(4.0/3.0))) - &
+                    0.717_REAL64 * (z_c**2 / a_c**(1.0/3.0) - z_a**2 / a_a**(1.0/3.0)) + &
+                    1.211_REAL64 * (z_c**2 / a_c - z_a**2 / a_a) 
+
+    END FUNCTION
+
+    !> \brief Sample the outgoing energy and scattering angle for a non-elastic collision
+    !> References:
+    !>  [1] https://doi.org/10.1088/1361-6560/ae5586
+    !>  [4] https://doi.org/10.2172/1425114
+    !> \param energy The energy of the proton
+    !> \param nuc The nuclide for which to sample the non-elastic collision
+    !> \param state The state of the random number generator
+    !> \return The scattering angle and outgoing energy for non-elastic scattering
+    FUNCTION sample_nonelastic_collision(energy, nuc, state) RESULT(ne_update)
+      REAL(KIND=REAL64), INTENT(IN) :: energy
+      TYPE(cp_nuclide), INTENT(IN) :: nuc
+      TYPE(KissRNGState), INTENT(INOUT) :: state
+      TYPE(xsecSample) :: sample
+      TYPE(nonElasticUpdate) :: ne_update
+      REAL(KIND=REAL64) :: e_a, e_b, aval, temp1, temp2, cos_alpha, u
+      
+      u = random(state)
+      sample = sampleAngleFromSection(NE_angle_cdf(nuc%xsec_ind), energy, u)
+
+      IF(sample%e == 0.0_REAL64) THEN
+        ! If outgoing energy is 0, then out_angle_lab should be 1,
+        ! rounding errors allow it to be slightly above 1 which is
+        ! invalid.
+        ne_update%cos_angle = 1.0_REAL64
+        ne_update%energy = 0.0_REAL64
+        RETURN
+      END IF
+
+      temp1 = separation_energy(nuc)
+      e_a = nuc%A * energy / (nuc%A + 1) + temp1 ! entrance channel energy p. 136 in [4] + S_a
+      e_b = (nuc%A + 1) * sample%e / nuc%A + temp1 ! emission channel energy p. 136 in [4] + S_b
+
+      ! Compute a
+      temp1 = MIN(e_a, 130.0_REAL64) * e_b / e_a
+      temp2 = MIN(e_a, 41.0_REAL64) * e_b / e_a
+      aval = 0.04 * temp1 + 1.8E-6_REAL64 * temp1**3 + 6.7E-7_REAL64 * temp2**4
+
+      ! Get cosine of outgoing scattering angle in centre-of-mass frame
+      temp1 = 2 * SINH(aval)
+      temp2 = sample%r * COSH(aval) - SINH(aval)
+      temp1 = temp1 * random(state) + temp2 ! C [1] p.10
+      temp2 = (temp1 + SQRT(temp1**2 - sample%r**2 + 1))/(1 + sample%r) ! mu p.10 [1]
+      cos_alpha = log(temp2) / aval 
+
+      ! Convert to scattering angle in lab frame see Eq. (6.7) in Section 6.2.3.2 in [4]
+      ne_update%energy = sample%e + energy / (nuc%A + 1)**2 + &
+              2 * SQRT(sample%e * energy) * cos_alpha / (nuc%A + 1)
+      ne_update%cos_angle = SQRT(sample%e / ne_update%energy) * cos_alpha + &
+              SQRT(energy / ne_update%energy) / (nuc%A + 1)
+
+    END FUNCTION
+
+    !> \brief Compute scattering angle and outgoing energy for non-elastic scattering
+    !> \param energy The energy of the proton
+    !> \param material The material through which the proton travels
+    !> \param state The state of the random number generator
+    !> \return The scattering angle and outgoing energy for non-elastic scattering
+    FUNCTION compute_nonelastic_scatter_update(energy, material, state) RESULT(ne_update)
+      REAL(KIND=REAL64), INTENT(IN) :: energy
+      TYPE(cp_material), INTENT(IN) :: material
+      TYPE(KissRNGState), INTENT(INOUT) :: state
+      TYPE(nonElasticUpdate) :: ne_update
+      REAL(KIND=REAL64) :: rate, u, tmp
+      INTEGER :: i
+      
+      rate = 0.0_REAL64
+      DO i = 1, material%no_nucs
+        rate = rate + material%nucs(i)%massFraction * &
+          evaluate(NE_crossSections(material%nucs(i)%xsec_ind), energy)
+      END DO
+
+      u = random(state)
+      tmp = material%nucs(1)%massFraction * &
+          evaluate(NE_crossSections(material%nucs(1)%xsec_ind), energy) / rate
+      DO i = 1, material%no_nucs
+        IF (tmp >= u .or. i == material%no_nucs) EXIT
+        tmp = tmp + material%nucs(i+1)%massFraction * &
+          evaluate(NE_crossSections(material%nucs(i+1)%xsec_ind), energy) / rate
+      END DO
+
+      ne_update = sample_nonelastic_collision(energy, material%nucs(i), state)
+    END FUNCTION
+
+    !> \brief Update direction of transport based on pre-computed scattering angle
+    !> \param direction_in The initial direction of transport in spherical coordinates
+    !> \param cos_angle The cosine of the scattering angle
+    !> \param state The state of the random number generator
+    !> \return The new direction of transport in spherical coordinates
+    FUNCTION nonelastic_scatter(direction_in, cos_angle, state) RESULT(direction_out)
+      REAL(KIND=REAL64), DIMENSION(2), INTENT(IN) :: direction_in
+      REAL(KIND=REAL64), INTENT(IN) :: cos_angle
+      TYPE(KissRNGState), INTENT(INOUT) :: state
+      REAL(KIND=REAL64), DIMENSION(2):: scatter_angles, direction_out
+
+      scatter_angles(1) = ACOS(cos_angle)
+      scatter_angles(2) = 2 * PI * random(state)
+
+      direction_out = update_direction(direction_in, scatter_angles)
+    END FUNCTION
+
+    
+    !> \brief Simulate elastic scattering
+    !> \param direction_in The initial direction of transport in spherical coordinates
+    !> \param energy The energy of the proton
+    !> \param state The state of the random number generator
+    !> \return The scattering angle
+    FUNCTION rutherford_elastic_scatter(direction_in, energy, material, state) RESULT(direction_out)
+      REAL(KIND=REAL64), DIMENSION(2), INTENT(IN) :: direction_in
+      REAL(KIND=REAL64), INTENT(IN) :: energy
+      TYPE(cp_material), INTENT(IN) :: material
+      TYPE(KissRNGState), INTENT(INOUT) :: state
+      REAL(KIND=REAL64), DIMENSION(2):: scatter_angles, direction_out
+      REAL(KIND=REAL64) :: rate, u, tmp
+      INTEGER :: i
+
+      rate = 0.0_REAL64
+      DO i = 1, material%no_nucs
+        rate = rate + material%nucs(i)%massFraction * &
+          evaluate(RU_crossSections(material%nucs(i)%xsec_ind), energy)
+      END DO
+
+      u = random(state)
+      tmp = material%nucs(1)%massFraction * &
+          evaluate(RU_crossSections(material%nucs(1)%xsec_ind), energy) / rate
+
+      DO i = 1, material%no_nucs
+        IF (tmp >= u .or. i == material%no_nucs) EXIT
+        tmp = tmp + material%nucs(i+1)%massFraction * &
+          evaluate(RU_crossSections(material%nucs(i+1)%xsec_ind), energy) / rate
+      END DO
+
+      u = random(state)
+      scatter_angles(1) = sampleAngleFromSection(RU_angle_cdf(material%nucs(i)%xsec_ind), energy, u)
+      scatter_angles(2) = 2 * PI * random(state)
+      
+      direction_out = update_direction(direction_in, scatter_angles)
+    END FUNCTION
+    
 END MODULE
