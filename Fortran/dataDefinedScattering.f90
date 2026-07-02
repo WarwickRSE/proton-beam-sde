@@ -4,15 +4,7 @@ MODULE dataDefinedScattering
     IMPLICIT NONE
 
     REAL(KIND=REAL64), PARAMETER :: pi = 3.14159265_REAL64
-    INTEGER, PARAMETER :: max_buf = 2**16, max_lines = 2**8
-
-    TYPE randomGen
-    ! This exists just to flag where random numbers are needed here
-    END TYPE
-    TYPE randomVal
-      REAL(KIND=REAL64) :: v
-    ! DItto
-    END TYPE
+    INTEGER, PARAMETER, PRIVATE :: max_lines = 2**8
 
     TYPE crossSection1D
         LOGICAL :: used=.TRUE., ready = .FALSE. ! Debug/development
