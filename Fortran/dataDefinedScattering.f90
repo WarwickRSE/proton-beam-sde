@@ -221,7 +221,6 @@ MODULE dataDefinedScattering
             ! TODO - handle this case better
             if(f_ct > a_ct) f_ct = a_ct
             crossSec%cdf(i)%angles = tmp(1:f_ct)
-            crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
             ! Allocate and read the cdf row including one value past the cutoff
             ALLOCATE(crossSec%cdf(i)%values(f_ct))
             READ(unit, *,IOSTAT=err) crossSec%cdf(i)%values
@@ -234,6 +233,7 @@ MODULE dataDefinedScattering
 
             ! Making a copy for the 1D X-section
             crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct)
+            crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = crossSec%cdf(i)%values / crossSec%cdf(i)%values(f_ct) 
         END DO
@@ -305,13 +305,12 @@ MODULE dataDefinedScattering
             ! TODO - check for off-by-one
             a_ct = SIZE(tmp)
             f_ct = MINLOC(tmp, DIM=1, MASK=(tmp >= cutoff)) +1
-            b_ct = MINLOC(tmp, DIM=1, MASK=(tmp > lab_ang_cutoff))
+            b_ct = MINLOC(tmp, DIM=1, MASK=(tmp > lab_ang_cutoff)) + 1
             IF(b_ct > f_ct) ERROR STOP "I don't think the cutoffs can be this way round"
             if(f_ct > a_ct) f_ct = a_ct
             ! Move the angles array
             crossSec%cdf(i)%angles = tmp(b_ct:f_ct)
-            crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
-            ! Allocate and read the cdf row including one value past the cutoff
+           ! Allocate and read the cdf row including one value past the cutoff
             ALLOCATE(crossSec%cdf(i)%values(f_ct-b_ct + 1))
             READ(unit, *) tmp(1:f_ct+1)
             crossSec%cdf(i)%values = tmp(b_ct:f_ct)
@@ -326,6 +325,7 @@ MODULE dataDefinedScattering
             crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = (crossSec%cdf(i)%values - crossSec%cdf(i)%values(1)) / (crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)) 
+            crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
         END DO
 
         crossSec%ready = .TRUE.
@@ -455,8 +455,7 @@ MODULE dataDefinedScattering
 
     PURE FUNCTION sampleAngleFromSection2D(crossSection, energy, val) RESULT(angle)
         TYPE(crossSection2D), INTENT(IN) :: crossSection
-        REAL(KIND=REAL64), INTENT(IN) :: energy
-        TYPE(randomVal), VALUE :: val
+        REAL(KIND=REAL64), INTENT(IN) :: energy, val
         REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
         REAL(KIND=REAL64) :: angle, tmp_angle, diff
         INTEGER :: sz, ind
@@ -464,17 +463,17 @@ MODULE dataDefinedScattering
         sz = SIZE(crossSection%energies)
         IF(energy <= crossSection%energies(1)) THEN
             ! Use lowest energy strand
-            angle = sampleAtEnergy(crossSection%cdf(1), val%v)
+            angle = sampleAtEnergy(crossSection%cdf(1), val)
         ELSE IF(energy > crossSection%energies(sz)) THEN
             ! Highest energy strand
-            angle = sampleAtEnergy(crossSection%cdf(sz), val%v)
+            angle = sampleAtEnergy(crossSection%cdf(sz), val)
         ELSE
             ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies >= energy))
             ! Do angle at ind
-            angle = sampleAtEnergy(crossSection%cdf(ind), val%v)
+            angle = sampleAtEnergy(crossSection%cdf(ind), val)
             IF((crossSection%energies(ind) - crossSection%energies(ind-1)) > tol) THEN
                 ! If needed do one bin lower and interpolate
-                tmp_angle = sampleAtEnergy(crossSection%cdf(ind-1), val%v)
+                tmp_angle = sampleAtEnergy(crossSection%cdf(ind-1), val)
                 diff = (energy - crossSection%energies(ind-1)) / &
                   (crossSection%energies(ind) - crossSection%energies(ind-1))
                 angle = angle * diff + tmp_angle * (1.0_REAL64 - diff)
@@ -521,8 +520,7 @@ MODULE dataDefinedScattering
     
     PURE FUNCTION sampleAngleFromSection3D(crossSection, energy, val) RESULT(sample)
         TYPE(crossSection3D), INTENT(IN) :: crossSection
-        REAL(KIND=REAL64), INTENT(IN) :: energy
-        TYPE(randomVal), VALUE :: val
+        REAL(KIND=REAL64), INTENT(IN) :: energy, val
         REAL(KIND=REAL64), PARAMETER :: tol = 1.0d-7
         REAL(KIND=REAL64) :: diff
         TYPE(xsecSample) :: sample, tmp_sample
@@ -531,18 +529,18 @@ MODULE dataDefinedScattering
         sz = SIZE(crossSection%energies)
         IF(energy <= crossSection%energies(1)) THEN
             ! Use lowest energy strand
-            sample = sampleAtEnergy(crossSection%cdf(1), crossSection%exit_energy(1), crossSection%rvalue(1), val%v)
+            sample = sampleAtEnergy(crossSection%cdf(1), crossSection%exit_energy(1), crossSection%rvalue(1), val)
         ELSE IF(energy > crossSection%energies(sz)) THEN
             ! Highest energy strand
-             sample = sampleAtEnergy(crossSection%cdf(sz), crossSection%exit_energy(sz), crossSection%rvalue(sz), val%v)
+             sample = sampleAtEnergy(crossSection%cdf(sz), crossSection%exit_energy(sz), crossSection%rvalue(sz), val)
         ELSE
             ind = MINLOC(crossSection%energies, DIM=1, MASK=(crossSection%energies >= energy))
             ! Do angle at ind
-            sample = sampleAtEnergy(crossSection%cdf(ind), crossSection%exit_energy(ind), crossSection%rvalue(ind), val%v)
+            sample = sampleAtEnergy(crossSection%cdf(ind), crossSection%exit_energy(ind), crossSection%rvalue(ind), val)
  
             IF((crossSection%energies(ind) - crossSection%energies(ind-1)) > tol) THEN
                 ! If needed do one bin lower and interpolate
-                tmp_sample = sampleAtEnergy(crossSection%cdf(ind-1), crossSection%exit_energy(ind-1), crossSection%rvalue(ind-1), val%v)
+                tmp_sample = sampleAtEnergy(crossSection%cdf(ind-1), crossSection%exit_energy(ind-1), crossSection%rvalue(ind-1), val)
                 diff = (energy - crossSection%energies(ind-1)) / &
                   (crossSection%energies(ind) - crossSection%energies(ind-1))
                 sample%e = sample%e * diff + tmp_sample%e * (1.0_REAL64 - diff)

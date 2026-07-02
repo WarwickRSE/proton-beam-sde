@@ -76,6 +76,7 @@ MODULE protonEffects
     PURE FUNCTION moliere_scattering_sd(material, energy, time_step) RESULT(sd)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy, time_step
+      REAL(KIND=REAL64), PARAMETER :: fixed_time_step = 0.05
       REAL(KIND=REAL64) :: chi_a_sq, chi_c_sq, pv_sq, beta_sq, sd, omega, temp1, temp2
       INTEGER :: i
 
@@ -103,10 +104,10 @@ MODULE protonEffects
       ! note denominator in log(chi_a_sq) same as chi_c_sq before multiplying by nucleide independent parameters
       chi_a_sq = EXP(chi_a_sq / chi_c_sq)
       ! multiply chi_c_sq by time_step and and parameters independent of the individual nucleides
-      chi_c_sq = chi_c_sq * 0.157_REAL64 * time_step * material%density / pv_sq
+      chi_c_sq = chi_c_sq * 0.157_REAL64 * fixed_time_step * material%density / pv_sq
       omega = chi_c_sq / (chi_a_sq * 2.0_REAL64 * (1.0_REAL64 - 0.98_REAL64)) ! 0.98 - truncation parameter, see p. 8 [1]
       ! standard deviation
-      sd = SQRT(chi_c_sq * ((1.0_REAL64 + omega) * LOG(1.0_REAL64 + omega) / omega - 1.0_REAL64) / (1.0_REAL64 + 0.98_REAL64**2))
+      sd = SQRT(time_step/fixed_time_step * chi_c_sq * ((1.0_REAL64 + omega) * LOG(1.0_REAL64 + omega) / omega - 1.0_REAL64) / (1.0_REAL64 + 0.98_REAL64**2))
     END FUNCTION
     
     !> \brief log(a_k^(m, theta)) defined in Eq. (5) in [3]
