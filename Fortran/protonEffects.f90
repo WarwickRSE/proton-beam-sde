@@ -191,9 +191,8 @@ MODULE protonEffects
     !> \param state The state of the random number generator
     !> \param b_state The state of the Box-Muller random number generator
     !> \return The number of blocks at time t
-    FUNCTION number_of_blocks(t, state, b_state) RESULT(n_blocks)
+    FUNCTION number_of_blocks(t, b_state) RESULT(n_blocks)
       REAL(KIND=REAL64), INTENT(IN) :: t
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       TYPE(BoxMullerRNGState), INTENT(INOUT) :: b_state
       REAL(KIND=REAL64) :: mu, sigma, u, theta, smin, smax, sincrement
       INTEGER :: n_blocks, i
@@ -202,13 +201,13 @@ MODULE protonEffects
       IF (t <= 0.07_REAL64) THEN
         ! In text underneath Alg. 2 in [2]:
         ! For t < 0.05 a normal approximation can be used.
-        mu = 2/t
-        sigma = SQRT(2.0_REAL64 / (3 * t))
+        mu = 2.0/t
+        sigma = SQRT(2.0_REAL64 / (3.0 * t))
         n_blocks = NINT(mu + sigma * random_box_muller(1.0_REAL64, b_state))
       ELSE
         ! Positive uniform random variable U ~ Uniform((0, 1]) 
         DO
-          u = random(state)
+          u = random(1)
           IF (u > 0) EXIT
         END DO
 
@@ -264,16 +263,15 @@ MODULE protonEffects
     !> \param state The state of the random number generator
     !> \param b_state The state of the Box-Muller random number generator
     !> \return The value of the process at the next time step
-    FUNCTION wright_fisher_diffusion(r, state, b_state) RESULT(y)
+    FUNCTION wright_fisher_diffusion(r, b_state) RESULT(y)
       REAL(KIND=REAL64), INTENT(IN) :: r
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       TYPE(BoxMullerRNGState), INTENT(INOUT) :: b_state
       REAL(KIND=REAL64) :: y
       INTEGER :: n_blocks
 
       IF (r > 1E-9_REAL64) THEN
-        n_blocks = number_of_blocks(r, state, b_state) ! Using Alg. 2 in [3]
-        y = random_beta(state, 1 + n_blocks) ! line 3 in Alg. 2 in [2]
+        n_blocks = number_of_blocks(r, b_state) ! Using Alg. 2 in [3]
+        y = random_beta(1 + n_blocks) ! line 3 in Alg. 2 in [2]
       ELSE
         y = r/2
         y = ABS(random_box_muller(SQRT(r * y * (1.0_REAL64 - y)), b_state))
@@ -292,10 +290,9 @@ MODULE protonEffects
     !> \param state The state of the random number generator
     !> \param b_state The state of the Box-Muller random number generator
     !> \return The new direction of the proton in spherical coordinates
-    FUNCTION spherical_bm(dt, energy, material, direction_in, state, b_state) RESULT(direction_out)
+    FUNCTION spherical_bm(dt, energy, material, direction_in, b_state) RESULT(direction_out)
       REAL(KIND=REAL64), INTENT(IN) :: dt, energy, direction_in(2)
       TYPE(cp_material), INTENT(IN) :: material
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       TYPE(BoxMullerRNGState), INTENT(INOUT) :: b_state
       REAL(KIND=REAL64) :: direction_out(2), z(3), u(3), w(3), y, denom, theta
     
@@ -304,8 +301,8 @@ MODULE protonEffects
       z(2) = sin(direction_in(1)) * sin(direction_in(2))
       z(3) = cos(direction_in(1))
 
-      y = wright_fisher_diffusion(moliere_scattering_sd(material, energy, dt)**2, state, b_state)
-      theta = 2 * PI * random(state)
+      y = wright_fisher_diffusion(moliere_scattering_sd(material, energy, dt)**2, b_state)
+      theta = 2 * PI * random(1)
       
       ! Set up defaults for when z is near (0, 0, 1)
       u = [1.0_REAL64/SQRT(2.0_REAL64), &
@@ -449,15 +446,14 @@ MODULE protonEffects
     !> \param nuc The nuclide for which to sample the non-elastic collision
     !> \param state The state of the random number generator
     !> \return The scattering angle and outgoing energy for non-elastic scattering
-    FUNCTION sample_nonelastic_collision(energy, nuc, state) RESULT(ne_update)
+    FUNCTION sample_nonelastic_collision(energy, nuc) RESULT(ne_update)
       REAL(KIND=REAL64), INTENT(IN) :: energy
       TYPE(cp_nuclide), INTENT(IN) :: nuc
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       TYPE(xsecSample) :: sample
       TYPE(nonElasticUpdate) :: ne_update
       REAL(KIND=REAL64) :: e_a, e_b, aval, temp1, temp2, cos_alpha, u
       
-      u = random(state)
+      u = random(1)
       sample = sampleAngleFromSection(NE_angle_cdf(nuc%xsec_ind), energy, u)
 
       IF(sample%e == 0.0_REAL64) THEN
@@ -481,7 +477,7 @@ MODULE protonEffects
       ! Get cosine of outgoing scattering angle in centre-of-mass frame
       temp1 = 2 * SINH(aval)
       temp2 = sample%r * COSH(aval) - SINH(aval)
-      temp1 = temp1 * random(state) + temp2 ! C [1] p.10
+      temp1 = temp1 * random(1) + temp2 ! C [1] p.10
       temp2 = (temp1 + SQRT(temp1**2 - sample%r**2 + 1))/(1 + sample%r) ! mu p.10 [1]
       cos_alpha = log(temp2) / aval 
 
@@ -498,10 +494,9 @@ MODULE protonEffects
     !> \param material The material through which the proton travels
     !> \param state The state of the random number generator
     !> \return The scattering angle and outgoing energy for non-elastic scattering
-    FUNCTION compute_nonelastic_scatter_update(energy, material, state) RESULT(ne_update)
+    FUNCTION compute_nonelastic_scatter_update(energy, material) RESULT(ne_update)
       REAL(KIND=REAL64), INTENT(IN) :: energy
       TYPE(cp_material), INTENT(IN) :: material
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       TYPE(nonElasticUpdate) :: ne_update
       REAL(KIND=REAL64) :: rate, u, tmp
       INTEGER :: i
@@ -512,7 +507,7 @@ MODULE protonEffects
           evaluate(NE_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
 
-      u = random(state)
+      u = random(1)
       tmp = material%nucs(1)%massFraction * &
           evaluate(NE_crossSections(material%nucs(1)%xsec_ind), energy) / rate
       DO i = 1, material%no_nucs
@@ -521,7 +516,7 @@ MODULE protonEffects
           evaluate(NE_crossSections(material%nucs(i+1)%xsec_ind), energy) / rate
       END DO
 
-      ne_update = sample_nonelastic_collision(energy, material%nucs(i), state)
+      ne_update = sample_nonelastic_collision(energy, material%nucs(i))
     END FUNCTION
 
     !> \brief Update direction of transport based on pre-computed scattering angle
@@ -529,14 +524,13 @@ MODULE protonEffects
     !> \param cos_angle The cosine of the scattering angle
     !> \param state The state of the random number generator
     !> \return The new direction of transport in spherical coordinates
-    FUNCTION nonelastic_scatter(direction_in, cos_angle, state) RESULT(direction_out)
+    FUNCTION nonelastic_scatter(direction_in, cos_angle) RESULT(direction_out)
       REAL(KIND=REAL64), DIMENSION(2), INTENT(IN) :: direction_in
       REAL(KIND=REAL64), INTENT(IN) :: cos_angle
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       REAL(KIND=REAL64), DIMENSION(2):: scatter_angles, direction_out
 
       scatter_angles(1) = ACOS(cos_angle)
-      scatter_angles(2) = 2 * PI * random(state)
+      scatter_angles(2) = 2 * PI * random(1)
 
       direction_out = update_direction(direction_in, scatter_angles)
     END FUNCTION
@@ -547,11 +541,10 @@ MODULE protonEffects
     !> \param energy The energy of the proton
     !> \param state The state of the random number generator
     !> \return The scattering angle
-    FUNCTION rutherford_elastic_scatter(direction_in, energy, material, state) RESULT(direction_out)
+    FUNCTION rutherford_elastic_scatter(direction_in, energy, material) RESULT(direction_out)
       REAL(KIND=REAL64), DIMENSION(2), INTENT(IN) :: direction_in
       REAL(KIND=REAL64), INTENT(IN) :: energy
       TYPE(cp_material), INTENT(IN) :: material
-      TYPE(KissRNGState), INTENT(INOUT) :: state
       REAL(KIND=REAL64), DIMENSION(2):: scatter_angles, direction_out
       REAL(KIND=REAL64) :: rate, u, tmp
       INTEGER :: i
@@ -562,7 +555,7 @@ MODULE protonEffects
           evaluate(RU_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
 
-      u = random(state)
+      u = random(1)
       tmp = material%nucs(1)%massFraction * &
           evaluate(RU_crossSections(material%nucs(1)%xsec_ind), energy) / rate
 
@@ -572,9 +565,9 @@ MODULE protonEffects
           evaluate(RU_crossSections(material%nucs(i+1)%xsec_ind), energy) / rate
       END DO
 
-      u = random(state)
+      u = random(1)
       scatter_angles(1) = sampleAngleFromSection(RU_angle_cdf(material%nucs(i)%xsec_ind), energy, u)
-      scatter_angles(2) = 2 * PI * random(state)
+      scatter_angles(2) = 2 * PI * random(1)
       
       direction_out = update_direction(direction_in, scatter_angles)
     END FUNCTION
