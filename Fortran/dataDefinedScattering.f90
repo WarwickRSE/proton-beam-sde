@@ -317,7 +317,7 @@ MODULE dataDefinedScattering
             crossSec1D%values(i) = crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)
             ! Re-normalise CDF so that last value is 1
             crossSec%cdf(i)%values = (crossSec%cdf(i)%values - crossSec%cdf(i)%values(1)) / (crossSec%cdf(i)%values(f_ct) - crossSec%cdf(i)%values(1)) 
-            crossSec%cdf(i)%angles(f_ct-b_ct+1) = cutoff ! Force last angle to cutoff
+            crossSec%cdf(i)%angles(f_ct) = cutoff ! Force last angle to cutoff
         END DO
 
         crossSec%ready = .TRUE.
