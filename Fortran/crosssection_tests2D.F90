@@ -8,7 +8,7 @@ PROGRAM crossSectionTests
     REAL(KIND=REAL64) :: val
     TYPE(crossSection2D) :: xsec
 
-    CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64)
+    CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64, "../Splines")
     xsec = getRU2DCrossSection(name)
 
     val = sampleAngleFromSection(xsec, 100.0_REAL64, randomVal(0.1_REAL64))

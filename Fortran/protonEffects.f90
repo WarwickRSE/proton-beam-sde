@@ -19,6 +19,9 @@ MODULE protonEffects
     
     CONTAINS
 
+    !> \brief Computes the inelastic energy loss per unit track length
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION bethe_bloch_loss(material, energy) RESULT(loss)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
@@ -37,35 +40,39 @@ MODULE protonEffects
       END DO
     END FUNCTION
 
+    !> \brief Computes the rate of large angle scattering per unit track
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION nonelastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
-      REAL(KIND=REAL64) :: rate, a
+      REAL(KIND=REAL64) :: rate
       
       INTEGER :: i
 
-      a = SUM(material%nucs%massFraction * material%nucs%A)
       rate = 0.0_REAL64
       DO i = 1, material%no_nucs
-        rate = rate + material%nucs(i)%massFraction * &
+        rate = rate + material%nucs(i)%massFraction / material%nucs(i)%A * &
           evaluate(NE_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
-      rate = rate * EXP(LOG(material%density) + log_avogadro - LOG(a) + log_barns_to_cmsq) ! rate per cm
+      rate = rate * EXP(LOG(material%density) + log_avogadro + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
 
+    !> \brief Compute the rate for rutherford and elastic scatter
+    !> \param material The current material containing a list of nucs
+    !> \param energy The initial energy
     PURE FUNCTION rutherford_and_elastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
-      REAL(KIND=REAL64) :: rate, a
+      REAL(KIND=REAL64) :: rate
       INTEGER :: i
 
-      a = SUM(material%nucs%massFraction * material%nucs%A)
       rate = 0.0_REAL64
       DO i = 1, material%no_nucs
-        rate = rate + material%nucs(i)%massFraction * &
+        rate = rate + material%nucs(i)%massFraction / material%nucs(i)%A * &
           evaluate(RU_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
-      rate = rate * EXP(LOG(material%density) + log_avogadro - LOG(a) + log_barns_to_cmsq) ! rate per cm
+      rate = rate * EXP(LOG(material%density) + log_avogadro + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
 
 
@@ -80,6 +87,7 @@ MODULE protonEffects
     PURE FUNCTION moliere_scattering_sd(material, energy, time_step) RESULT(sd)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy, time_step
+      REAL(KIND=REAL64), PARAMETER :: fixed_time_step = 0.05
       REAL(KIND=REAL64) :: chi_a_sq, chi_c_sq, pv_sq, beta_sq, sd, omega, temp1, temp2
       INTEGER :: i
 
@@ -107,10 +115,10 @@ MODULE protonEffects
       ! note denominator in log(chi_a_sq) same as chi_c_sq before multiplying by nucleide independent parameters
       chi_a_sq = EXP(chi_a_sq / chi_c_sq)
       ! multiply chi_c_sq by time_step and and parameters independent of the individual nucleides
-      chi_c_sq = chi_c_sq * 0.157_REAL64 * time_step * material%density / pv_sq
+      chi_c_sq = chi_c_sq * 0.157_REAL64 * fixed_time_step * material%density / pv_sq
       omega = chi_c_sq / (chi_a_sq * 2.0_REAL64 * (1.0_REAL64 - 0.98_REAL64)) ! 0.98 - truncation parameter, see p. 8 [1]
       ! standard deviation
-      sd = SQRT(chi_c_sq * ((1.0_REAL64 + omega) * LOG(1.0_REAL64 + omega) / omega - 1.0_REAL64) / (1.0_REAL64 + 0.98_REAL64**2))
+      sd = SQRT(time_step/fixed_time_step * chi_c_sq * ((1.0_REAL64 + omega) * LOG(1.0_REAL64 + omega) / omega - 1.0_REAL64) / (1.0_REAL64 + 0.98_REAL64**2))
     END FUNCTION
     
     !> \brief log(a_k^(m, theta)) defined in Eq. (5) in [3]
