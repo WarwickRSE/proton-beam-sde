@@ -16,7 +16,7 @@ MODULE SDEFileUtilities
     REAL(KIND=REAL64), ALLOCATABLE, DIMENSION(:), INTENT(INOUT) :: row
     INTEGER, INTENT(INOUT) :: err
     LOGICAL, INTENT(IN), OPTIONAL :: dealloc
-    CHARACTER(LEN=1), VALUE, OPTIONAL :: delim
+    CHARACTER(LEN=1), INTENT(IN), OPTIONAL :: delim
     CHARACTER(LEN=:), ALLOCATABLE, SAVE :: buffer
     CHARACTER(LEN=30) :: fmt
     INTEGER :: sz
@@ -41,7 +41,7 @@ MODULE SDEFileUtilities
   FUNCTION lineToArray(line, delim_in) RESULT(row)
     CHARACTER(LEN=*), INTENT(IN) :: line
     REAL(KIND=REAL64), ALLOCATABLE, DIMENSION(:) :: row
-    CHARACTER(LEN=1), VALUE, OPTIONAL :: delim_in
+    CHARACTER(LEN=1), INTENT(IN), OPTIONAL :: delim_in
     CHARACTER(LEN=1) :: delim
     INTEGER :: err, j, st, st_old, ind
 
