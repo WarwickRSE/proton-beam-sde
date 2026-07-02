@@ -462,7 +462,12 @@ struct CS_2d {
                             (1 - lin_inter_val) * tmp_val_old);
           lin_inter_bool = false;
         }
+        if(lin_inter_bool){
+          // Did not add interpolated value
+          tmp_vec.push_back(tmp_val_old)
+        }
       }
+
       top_rate = tmp_vec.back();
       bottom_rate = tmp_vec.front();
       total_rate = top_rate - bottom_rate;

@@ -179,11 +179,9 @@ struct Material {
   double nonelastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
     double log_barns_to_cmsq = -24 * log(10);
-    double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
-      a += x[i] * at[i].a; // average molar mass
-      ret += x[i] * at[i].ne_rate.evaluate(e);
+      ret += x[i] * at[i].ne_rate.evaluate(e) / at[i].a;
     }
     double log_molecule_density =
         log(density) + log_avogadro - log(a); // molecules / cm^3
@@ -194,11 +192,9 @@ struct Material {
   double rutherford_and_elastic_rate(const double e) const {
     double log_avogadro = log(6) + 23 * log(10);
     double log_barns_to_cmsq = -24 * log(10);
-    double a = 0;
     double ret = 0;
     for (unsigned int i = 0; i < at.size(); i++) {
-      a += x[i] * at[i].a; // average molar mass
-      ret += x[i] * at[i].el_ruth_rate.evaluate(e);
+      ret += x[i] * at[i].el_ruth_rate.evaluate(e) / at[i].a;
     }
     double log_molecule_density =
         log(density) + log_avogadro - log(a); // molecules / cm^3

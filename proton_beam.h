@@ -96,7 +96,7 @@ struct proton_path {
 
   int number_of_blocks(const double t, gsl_rng *gen) const {
     int m = 0;
-    double theta = 1;
+    const double theta = 1;
     if (t < 0.07) {
       double mu = 2 / t;
       double sigma = sqrt(2 / (3 * t));
