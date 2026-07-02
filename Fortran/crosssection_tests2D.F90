@@ -4,34 +4,34 @@ PROGRAM crossSectionTests
     IMPLICIT NONE
 
 
-    CHARACTER(LEN=30) :: name = "hydrogen"
+    CHARACTER(LEN=30) :: name = "oxygen"
     REAL(KIND=REAL64) :: val
     TYPE(crossSection2D) :: xsec
 
     CALL defineCrossSections([name], 0.04_REAL64, 0.04_REAL64, "../Splines")
     xsec = getRU2DCrossSection(name)
 
-    val = sampleAngleFromSection(xsec, 100.0_REAL64, randomVal(0.1_REAL64))
+    val = sampleAngleFromSection(xsec, 100.0_REAL64, 0.1_REAL64)
     PRINT*, val
-    val = sampleAngleFromSection(xsec, 73.0_REAL64, randomVal(0.1_REAL64))
+    val = sampleAngleFromSection(xsec, 73.0_REAL64, 0.1_REAL64)
     PRINT*, val
-    val = sampleAngleFromSection(xsec, 5.3_REAL64, randomVal(0.5_REAL64))
-    PRINT*, val
-
-    val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(0.0_REAL64))
-    PRINT*, val
-    val = sampleAngleFromSection(xsec, 1.0_REAL64, randomVal(1.0_REAL64))
+    val = sampleAngleFromSection(xsec, 5.3_REAL64, 0.5_REAL64)
     PRINT*, val
 
+    val = sampleAngleFromSection(xsec, 1.0_REAL64, 0.0_REAL64)
+    PRINT*, val
+    val = sampleAngleFromSection(xsec, 1.0_REAL64, 1.0_REAL64)
+    PRINT*, val
 
-    val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(0.0_REAL64))
+
+    val = sampleAngleFromSection(xsec, 160.0_REAL64, 0.0_REAL64)
     PRINT*, val
-    val = sampleAngleFromSection(xsec, 160.0_REAL64, randomVal(1.0_REAL64))
+    val = sampleAngleFromSection(xsec, 160.0_REAL64, 1.0_REAL64)
     PRINT*, val
 
-    val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.1_REAL64))
+    val = sampleAngleFromSection(xsec, 150.0_REAL64, 0.1_REAL64)
     PRINT*, val
-    val = sampleAngleFromSection(xsec, 150.0_REAL64, randomVal(0.67_REAL64))
+    val = sampleAngleFromSection(xsec, 150.0_REAL64, 0.67_REAL64)
     PRINT*, val
 
 #ifdef undef
@@ -76,15 +76,31 @@ NOTE: lab_ang_cutoff is about 1.55
 
 Fortran
 
-   1.5502732698094992     
-   1.5504138807854488     
-   1.5507707812916556     
-   1.5507936655375631     
+   1.4499630036505826     
+   1.5392489413257029     
+   1.5316214947367850     
+   1.5507131931784290     
+   3.9497439654753559E-002
+   1.5499317998036497     
+   3.9935425037242712E-002
+   1.3780458774630606     
+  0.54078352971086474  
+  
+
+c++
+
+
+
+Fortran
+  0.32835793450464956     
+  0.37487729503721190     
+   5.6465170354506974E-002
+   3.1415926535897931     
    4.0000000000000001E-002
-   1.5500154014037679     
+   3.1415926535897931     
    4.0000000000000001E-002
-   1.5500154014037679     
-  0.61981994317006173   
+  0.26027328163412861     
+   5.9294522246662894E-002
 
 #endif
 

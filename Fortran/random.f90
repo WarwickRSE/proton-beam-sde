@@ -31,6 +31,7 @@ MODULE randomMod
      end function pdf_2v
     END INTERFACE
 
+   PRIVATE :: KissRNGState
   CONTAINS 
 
   ! George Marsaglia - type KISS generator
@@ -42,6 +43,15 @@ MODULE randomMod
   ! Overall period>2^123;  Default seeds x,y,z,w.
 
   FUNCTION random(state)
+
+    INTEGER :: state
+    TYPE(KissRNGState), SAVE :: k_state
+    REAL :: random
+    random = REAL(random_k(k_state))
+
+  END FUNCTION
+
+  FUNCTION random_k(state) RESULT(random)
 
     TYPE(KissRNGState), INTENT(INOUT) :: state
     REAL(KIND=REAL64) :: random
@@ -64,7 +74,7 @@ MODULE randomMod
 
     random = (REAL(kiss, KIND=REAL64) + 2147483648.0_REAL64) / 4294967296.0_REAL64
 
-  END FUNCTION random
+  END FUNCTION random_k
 
   SUBROUTINE random_warmup(state, seed)
 
@@ -80,7 +90,7 @@ MODULE randomMod
 
     ! 'Warm-up' the generator by cycling through a few times
     DO i = 1, 1000
-      dummy = random(state)
+      dummy = random_k(state)
     ENDDO
 
   END SUBROUTINE random_warmup
@@ -88,9 +98,8 @@ MODULE randomMod
   ! Basic rejection sampling from PDF defined as follows
   ! range is assumed to be [0,1], pdf is assumed normalised to peak at 1
   ! pdf is assumed to be strictly > 0 else the sampling may loop-out
-  FUNCTION rejection_sample(state, pdf_fn) RESULT(val)
+  FUNCTION rejection_sample(pdf_fn) RESULT(val)
 
-    TYPE(KissRNGState), INTENT(INOUT) :: state
     PROCEDURE(pdf) :: pdf_fn
     REAL(KIND=REAL64) :: val
     REAL(KIND=REAL64) :: x, y
@@ -100,8 +109,8 @@ MODULE randomMod
     val = 0.0_REAL64
     DO i = 1, max_it
       ! Without a better guess, sample uniform in x and y
-      x = random(state)
-      y = random(state)
+      x = random(1)
+      y = random(1)
         PRINT*, i, x, y, pdf_fn(x)
       IF(pdf_fn(x) > y) THEN
         val = x
@@ -117,9 +126,8 @@ MODULE randomMod
   ! range is assumed to be [0,1], pdf is assumed normalised to peak at 1
   ! pdf is assumed to be strictly > 0 else the sampling may loop-out
   ! alpha is assumed == 1, beta is as given
-  FUNCTION rejection_sample_beta(state, pdf_fn, beta) RESULT(val)
+  FUNCTION rejection_sample_beta(pdf_fn, beta) RESULT(val)
 
-    TYPE(KissRNGState), INTENT(INOUT) :: state
     PROCEDURE(pdf_2v) :: pdf_fn
     INTEGER :: beta
     REAL(KIND=REAL64) :: val
@@ -130,8 +138,8 @@ MODULE randomMod
     val = 0.0_REAL64
     DO i = 1, max_it
       ! Without a better guess, sample uniform in x and y
-      x = random(state)
-      y = random(state)
+      x = random(1)
+      y = random(1)
         PRINT*, i, x, y, pdf_fn(x, beta)
       IF(pdf_fn(x, beta) > y) THEN
         val = x
@@ -161,8 +169,8 @@ MODULE randomMod
       state%has_cache = .TRUE.
 
       DO
-        rand1 = random(state%k_state)
-        rand2 = random(state%k_state)
+        rand1 = random(1)
+        rand2 = random(1)
 
         rand1 = 2.0_REAL64 * rand1 - 1.0_REAL64
         rand2 = 2.0_REAL64 * rand2 - 1.0_REAL64
