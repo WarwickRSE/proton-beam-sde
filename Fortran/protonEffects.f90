@@ -36,32 +36,30 @@ MODULE protonEffects
     PURE FUNCTION nonelastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
-      REAL(KIND=REAL64) :: rate, a
+      REAL(KIND=REAL64) :: rate
       
       INTEGER :: i
 
-      a = SUM(material%nucs%massFraction * material%nucs%A)
       rate = 0.0_REAL64
       DO i = 1, material%no_nucs
-        rate = rate + material%nucs(i)%massFraction * &
+        rate = rate + material%nucs(i)%massFraction / material%nucs(i)%A * &
           evaluate(NE_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
-      rate = rate * EXP(LOG(material%density) + log_avogadro - LOG(a) + log_barns_to_cmsq) ! rate per cm
+      rate = rate * EXP(LOG(material%density) + log_avogadro + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
 
     PURE FUNCTION rutherford_and_elastic_rate(material, energy) RESULT(rate)
       TYPE(cp_material), INTENT(IN) :: material
       REAL(KIND=REAL64), INTENT(IN) :: energy
-      REAL(KIND=REAL64) :: rate, a
+      REAL(KIND=REAL64) :: rate
       INTEGER :: i
 
-      a = SUM(material%nucs%massFraction * material%nucs%A)
       rate = 0.0_REAL64
       DO i = 1, material%no_nucs
-        rate = rate + material%nucs(i)%massFraction * &
+        rate = rate + material%nucs(i)%massFraction / material%nucs(i)%A * &
           evaluate(RU_crossSections(material%nucs(i)%xsec_ind), energy)
       END DO
-      rate = rate * EXP(LOG(material%density) + log_avogadro - LOG(a) + log_barns_to_cmsq) ! rate per cm
+      rate = rate * EXP(LOG(material%density) + log_avogadro + log_barns_to_cmsq) ! rate per cm
     END FUNCTION
 
 
